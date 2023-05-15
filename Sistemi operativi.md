@@ -470,3 +470,92 @@ il kernel isola i vari processi che fanno parte del container dagli altri proces
 
 Permette di eseguire codice in un linguaggio macchina di una macchina non fisica, ma astratta (emulata da una macchina fisica nella quale è in esecuzione). La JVM ha un proprio linguaggio macchina (bytecode) eseguito su più SO. <br>
 Può eseguire applicazioni java su host system diversi, perché vengono compilate in linguaggio macchina. Questa caratteristica rende java perfetto per applicazioni multipiattaforma.
+
+
+## I processi
+
+Un **processo** è un programma in esecuzione. E' un'entità attiva che ha bisogno di risorse per svolgere il suo lavoro. L'esecuzione del programma deve procedere in modo sequenziale e sfruttano le chiamate di sistema per interagire con il sistema operativo. <br>
+
+Un processo include:
+
++ **program counter**;
++ **sezione dati**;
++ **stack**;
+
+![processo in memoria](images/processo-memoria.png)
+
+Un sistema operativo esegue più processi alla volta e ha quindi il compito di astrarre la gestione della memoria in modo che ogni processo veda il proprio spazio di memroizzazione senza interferenze da parte degli altri processi.
+
+Un processo può trovarsi in uno dei segueni **stati**:
+
++ **new**: il processo è in fase di creazione
++ **ready**: il processo è pronto per essere eseguito
++ **running**: il processo è in esecuzione
++ **waiting**: il processo è in attesa di un evento (es. I/O)
++ **terminated**: il processo ha terminato l'esecuzione
+
+e passa da uno stato all'altro secondo il seguente grafico:
+  
+![stati-processo](images/stati-processo.png)
+
+Le informazioni associate (caratteristiche) a un processo vengono memorizzate in una struttura dati del kernel detta **Process Control Block (PCB)**. Il PCB contiene:
+
++ Stato del processo;
++ process number (pid);
++ program counter (PC): che si aggiorna quando si verificano delle interrupt e il processo passa dallo stato di running a quello di ready (o waiting);
++ registri della CPU: salvati quando il processo passa dallo stato di running a quello di ready;
++ informazioni per lo scheduling della CPU;
++ informazioni per la gestione della memoria: zona di memoria associata al processo;
++ informazioni di accounting: quante risorse ha utilizzato; 
++ informazioni di I/O: quali dispositivi di I/O sono assegnati al processo
+
+Vediamo come la CPU passa da un processo all'altro:
+
+![cambio-processo](images/cambio-processo.png)
+
+I processi vengono divisi in code a seconda del loro stato e possono migrare tra le varie cose. Generalmente esistono tre code principali:
+
++ **ready queue**: contiene tutti i processi pronti e in attesa di essere eseguiti
++ **device queue**: contiene i processi in attesa di un dispositivo di I/O
++ **job queue**: contiene tutti i processi nel sistema
+
+I processi entrano nella ready queue, vanno nella CPU e poi possono uscire oppure andare in una coda di I/O. Allo scadere del tempo di CPU può tornare nello stato di ready. Un processo può anche generare un nuovo processo figlio (*fork a child*), eseguire il processo e rientrare nella ready queue.
+
+![scheduling-processi](images/scheduling-processi.png)
+
+### Schedulers
+
+I **schedulers** sono i moduli del sistema operativo che si occupano di decidere quali processi far eseguire alla CPU. Ne esistono di tre tipi:
+
++ **long-term scheduler**: decide quali processi vanno dalla job queue alla ready queue. Questo scheduler è molto importante, perché determina il grado di multiprogrammazione del sistema. Se il grado di multiprogrammazione è troppo basso, la CPU è spesso inattiva; se è troppo alto, i processi vanno in attesa di CPU e si ha un aumento del tempo di risposta. Il long-term scheduler viene eseguito molto raramente (secondi, minuti, ore) e viene chiamato anche **job scheduler** o **admission scheduler**.
++ **short-term scheduler**: decide quali processi vanno dalla ready queue alla CPU. Questo scheduler viene eseguito molto spesso (decine di volte al secondo) e viene chiamato anche **CPU scheduler**.
++ **medium-term scheduler**: decide quali processi vanno dalla memoria secondaria alla memoria primaria. Questo scheduler viene eseguito molto raramente (minuti, ore) e viene chiamato anche **swapper**.
+
+I processi possono essere divisi in due categorie:
+
++ **a prevalenza di I/O**: passa più tempo a fare I/O che a eseguire istruzioni (processi interattivi);
++ **a prevalenza di CPU**: passa più tempo a eseguire istruzioni che a fare I/O.
+
+Quando la CPU viene assegnata ad un altro processo, il sistema deve salvare lo stato del processo e caricare lo stato del nuovo processo (lo stato del processo è salvato nel PCB). Questa operazione è detta **context switch** e comporta un calo delle prestazioni; il sistema non fa nessun lavoro utile alla computazione mentre effettua il cambio di contesto, quindi questo calo delle prestazioni va ridotto al minimo, in modo da massimizzare l'efficacia della CPU. <br>
+Il tempo impiegato per il context switch è determinato dal supporto hardware.
+
+### Creazione dei processi
+
+Come visto nello scheduling di un processo, un processo (parent) può generare un processo figlio (child), che a sua volta crea altri processi, formando un albero di processi. Il sistema operativo crea un processo iniziale (init) che crea tutti gli altri processi. <br> 
+Un processo figlio può condividere alcune risorse con il processo padre, come la memoria, i file, i dispositivi di I/O ecc. Si hanno 3 possibilità:
+
++ genitore e figlio condividono tutte le risorse
++ genitore e figlio condividono alcune risorse
++ genitore e figlio non condividono nessuna risorsa
+
+Per quanto riguarda l'esecuzione, un processo padre e un processo figlio possono essere eseguito in maniere concorrente, oppure un processo padre può essere messo in stato di *wait* finché il processo figlio non termina. <br>
+
+per quanto riguarda la l'allocazione in memoria, un processo figlio può essere creato come un duplicato del processo padre, oppure creato con un programma caricato dentro di esso. <br>
+
+**UNIX** usa il primo approccio: La chiamata di sistema **fork** crea un nuovo processo duplicato del padre, l'unica cosa che cambia tra padre e figlio è il valore ritornato da fork: 0 per il figlio e il pid del figlio per il padre. <br>
+La chiamata di sistema **exec** viene usata dopo una fork sostituire il processo in memoria con il processo figlio. <br>
+
+![creazione-processi-unix](images/creazione-processi-unix.png)
+
+La chiamata di sistema **exit** termina il processo e restituisce il controllo al processo padre.
+
