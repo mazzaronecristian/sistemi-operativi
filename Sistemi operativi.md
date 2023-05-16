@@ -539,7 +539,7 @@ I processi possono essere divisi in due categorie:
 Quando la CPU viene assegnata ad un altro processo, il sistema deve salvare lo stato del processo e caricare lo stato del nuovo processo (lo stato del processo è salvato nel PCB). Questa operazione è detta **context switch** e comporta un calo delle prestazioni; il sistema non fa nessun lavoro utile alla computazione mentre effettua il cambio di contesto, quindi questo calo delle prestazioni va ridotto al minimo, in modo da massimizzare l'efficacia della CPU. <br>
 Il tempo impiegato per il context switch è determinato dal supporto hardware.
 
-### Creazione dei processi
+### Creazione e terminazione dei processi
 
 Come visto nello scheduling di un processo, un processo (parent) può generare un processo figlio (child), che a sua volta crea altri processi, formando un albero di processi. Il sistema operativo crea un processo iniziale (init) che crea tutti gli altri processi. <br> 
 Un processo figlio può condividere alcune risorse con il processo padre, come la memoria, i file, i dispositivi di I/O ecc. Si hanno 3 possibilità:
@@ -569,8 +569,89 @@ I processi eseguiti da riga di comando hanno associato:
 + **strame di output**: su cui il processo scrive i dati
 + **strame di errori**: su cui il processo scrive i messaggi eventuali di errore
 
-I processi si possono comporre connettendo lo stream di output di uno sullo stream di input di un altro, usando una **pipe** (|). <br>
+I processi si possono comporre connettendo lo stream di output di uno sullo stream di input di un altro, usando una **pipe**: 
 
 ![processi-pipe](images/processi-pipe.png)
 
-grep è un processo che cerca una stringa in un file e restituisce le righe che contengono la stringa cercata. <br>wc è un processo che conta il numero di righe, parole e caratteri di un file (in queto caso nello stream di output di grep ^a). <br>
++ *grep* è un processo che cerca una stringa in un file e restituisce le righe che contengono la stringa cercata.
++ *wc* è un processo che conta il numero di righe, parole e caratteri di un file (in queto caso nello stream di output di *grep ^a*).
+
+L'esecuzione dei processi in *Java* avviene attraverso il metodo *exec* della classe **RunTime**. In jav l'esezuzione diretta di nuovi processi limita la portabilità dell'applicazione; (es. potrei eseguire un processo di windows che non è presente su linux) è sempre meglio usare i **THREAD**, perché vengono eseguiti nella **JVM**, che è indipendente dal sistema operativo.
+
+### Processi cooperativi e indipententi
+
+Un processo è detto **indipendente** se non viene influenzato e non influenza l'esecuzione di altri processi. Un processo è detto **cooperativo** se può influenzare o essere influenzato dall'esecuzione di altri processi; i processo cooperano per un certo obiettivo. <br>
+I processi cooperativi presentano dei vantaggi:
+
++ Condivizione delle informazioni;
++ velocizzazione delle elaborazioni: alcuni processi si occupano di cose diverse in parallelo a altri; 
++ modularità: processi diversi si occupano di cose diverse;
++ convenienza economica;
++ posso creare un sistema distribuito.
+
+### InterProcess Communication (IPC)
+
+Come già detto, i processi cooperativi hanno bisogno di comunicare tra loro. IPC è un meccanismo usati dai processi per lo scambio di dati, attraverso sue modelli princali:
+
++ (a) **memoria condivisa**: viene creata una zona di memoria condivisa tra più processi, che possono leggere e scrivere in essa. Questo metodo è molto veloce, ed è usata per scambiare grandi quantità di dati. Il problema di questo metodo è che un processo non sa quanto un altro ha scritto o letto sulla memoria condivisa, rendendo complicata la sincronizzazione. Esistono dei metodi per risolvere il problema: come il polling (poco efficiente)
++ (b) **scambio di messaggi**: metodo più lento, che permette di sincronizzare facilmente i processi. Mettiamo caso che A voglia scambiare un messaggio con B: A invia il messaggio al kernel sistema operativo, che ne fa una copia e lo memorizza in una coda di messaggi. B legge il messaggio dalla coda e lo elimina. Il problema di questo metodo è che il sistema operativo deve gestire la coda dei messaggi, che può diventare molto lunga. E' l'ideale per lo scambio di piccole quantità di dati.
+
+![modelli-comunicazione](images/modelli-comunicazione.png)
+
+IPC fornisce due operazione di base:
+
++ **send(message)**: invia un messaggio di grandezza fissa o variabile
++ **receive(message)**: riceve un messaggio di grandezza fissa o variabile
+
+Se i processi P e Q vogliono comunicare, devono stabilire un canale di comunicazione tra loro e usare le operazioni sopra descritte per scambiare messaggi. <br>
+Il canale di comunicazione può essere:
+
++ livello fisico (es. memoria condivisa, hardware bus)
++ livello logico (es. proprietà logiche)
+
+#### Comunicazione diretta
+
+I processi devono nominarsi esplicitamente all'interno delle funzioni (send(P, message), receive(Q, message)). In questo tipo di comunicazione, il canale è stabilito automaticamente tra due processi comunicanti con un collegamento; tra due coppie di processi può esiste un solo collegamento e può essere unidirezionale o bidirezionale. Questo metodo è un po' scomodo nel caso in cui un processo debba comunicare con più di un processo, perché deve creare un collegamento per ogni processo con cui vuole comunicare. 
+
+#### Comunicazione indiretta
+
+Questo metodo è molto più usato e permette di astrarre la comunicazione rta processi: I messaggi inviati da un processo sono diretti e vengono ricevuti da una porta (o mailbox), identificata con un numero univoco. I processi possono comunicare solo ce condividono una porta. <br>
+Il collegamento viene stabilito solo se i processi condividono una porta; può essere associato a pià processi e una coppia può condividre più collegamenti. 
+
+Le operazioni di una comunicazione indiretta sono: 
+
++ creare una porta
++ inviare e ricevere messaggi tramite una porta
++ distruggere una porta
+
+Le primitive send e receive sono uguali a quelle della comunicazione diretta, solo che prendono in ingresso l'identificativo della porta. 
+
+Ora mettiamo caso che tre processi: P1, P2, P3 condividano la porta A. P1 invia sulla porta A; P2 e P3 ricevono. Chi prende il messaggio? Per risolvere queste situazioni esistono varie tecniche:
+
++ Permettere che una porta possa essere associata al più a due processi (molto limitante)
++ Permettere che solo un processo alla volta possa ricevere sulla porta
++ Permettere che il sistema operativo scelga in modo arbitrario quale processo riceve il messaggio, al processo inviante viene notificato quale processo ha ricevuto il messaggio
+
+#### Sincronizzazione 
+
+L’invio/ricezione di messaggi può essere bloccante o
+non bloccante
++ **Bloccante** è considerato **sincrono**
+  + Invio bloccante: il processo viene bloccato fino a
+che il messaggio non viene ricevuto
+  + Ricezione bloccante: il processo viene bloccato
+fino a che un messaggio è disponibile
++ **Non bloccante** è considerato **asincrono**
+  + Invio non bloccante: il processo invia il
+messaggio e continua
+  + Ricezione non bloccante: il processo riceve un
+messaggio valido o un messaggio nullo
+
+#### Code di messaggi
+
+Il sistema operativo ha il compito di gestire le code di messaggi. Ne esistono di due tipi:
+
++ **capacità zero**: Il processo inviante deve aspettare il processo ricevente...si devono incontrare
++ **capacità limitata**: La coda ha capacità limitata n e il processo inviante aspetta solo se la coda è piena 
+
+## Threads
