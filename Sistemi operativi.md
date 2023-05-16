@@ -557,5 +557,20 @@ La chiamata di sistema **exec** viene usata dopo una fork sostituire il processo
 
 ![creazione-processi-unix](images/creazione-processi-unix.png)
 
-La chiamata di sistema **exit** termina il processo e restituisce il controllo al processo padre.
+La chiamata di sistema **exit** termina il processo e restituisce il controllo al processo padre. La chiamata exit viene effettuata dal processo figlio al termine dell'esecuzione della sua ultima istruzione. Questa chiamata ha il compito di liberare le risorse del processo e di restituire lo stato di terminazione al processo padre, che lo riceve dalla wait. <br>
 
+Un processo figlio può anche venir terminato direttamente dal processo padre, attraverso una chiamata di sistema **abort**. Questo si verifica se il compito del figlio non è più necessario o se il processo padre termina: alcuni sistemi operativi non permettono ai figli di continuare se il processo padre termina (*terminazione in cascata*); altri invece assegnano i figli al processo iniziale (init). <br>
+
+Se un processo ha portato a termine la sua esecuzione, ma ha ancora un pid e un PCB associato, viene detto **zombie**. Il PCB viene tenuto in memoria finché il processo padre non fa una wait. Un eccessivo numero di processi zombie può essere problematico dal punto di vista della memoria.
+
+I processi eseguiti da riga di comando hanno associato:
+
++ **stream di input**: da cui il processo legge i dati (sequenza indefinita di caratteri)
++ **strame di output**: su cui il processo scrive i dati
++ **strame di errori**: su cui il processo scrive i messaggi eventuali di errore
+
+I processi si possono comporre connettendo lo stream di output di uno sullo stream di input di un altro, usando una **pipe** (|). <br>
+
+![processi-pipe](images/processi-pipe.png)
+
+grep è un processo che cerca una stringa in un file e restituisce le righe che contengono la stringa cercata. <br>wc è un processo che conta il numero di righe, parole e caratteri di un file (in queto caso nello stream di output di grep ^a). <br>
