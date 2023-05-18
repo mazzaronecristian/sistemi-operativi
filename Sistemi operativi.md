@@ -655,3 +655,60 @@ Il sistema operativo ha il compito di gestire le code di messaggi. Ne esistono d
 + **capacità limitata**: La coda ha capacità limitata n e il processo inviante aspetta solo se la coda è piena 
 
 ## Threads
+
+Il sistema operativo è in grado di eseguire processi single e multi-thread. I processi multi-thread, condividono il codice i dati (variabili globali) e i file, mentre hanno uno stack e dedicato e ognuno ha i propri registri. <br>
+
+![multi-thread](images/multi-thread.png)
+
+Usare i multi-thread invece dei processi a singolo thread, porta certi benefici: 
+
++ Diminuisce i tempi di risposta di una applicazione: durante un periodo di attesa, altre attività della applicazione possono essere svolte;
++ Condiviione delle risorse: tutti i thread accedono alla stessa area di memoria e ai file aperti dal processo;
++ Economia: creare un thread è più veloce che creare un processo, anche il context switch è più veloce (devo solo cambiare lo stack e i registri);
++ Utilizzare un'architettura multi processore: possibilità di un effettivo parallelismo tra i processi
+
+Esiatono due tipi di thread:
+
++ **User-level threads**: sono gestiti dal programma utente, senza l'intervento del sistema operativo. Il sistema operativo non è a conoscenza dell'esistenza dei thread e li tratta come processi single-thread. Il vantaggio è che non c'è bisogno di supporto hardware, ma il sistema operativo non può intervenire in caso di blocco di un thread.
++ **Kernel-level threads**: sono gestiti dal sistema operativo. Il sistema operativo è a conoscenza dell'esistenza dei thread e può intervenire in caso di blocco di un thread. Il vantaggio è che il sistema operativo può intervenire in caso di blocco di un thread, ma il supporto hardware è necessario.
+
+Questi due tipi di thread sono messi in realzione tra loro, secondo differenti tipi di gestione dei thread:
+
++ **Many-to-One**: molti thread utente sono mappati su un singolo thread kernel. Questo tipo di gestione è molto veloce, ma se un thread utente esegue una chiamata di sistema bloccante, tutti i thread utente vengono bloccati e tutti i thread utente usano un singolo core. In più questa gestione non è pre-emptive, quindi la CPU deve essere rilasciata esplicitamente
++ **one-to-one**: ogni thread utente è mappato su un thread kernel. Questo tipo di gestione è molto più flessibile, i thread non vengono bloccati dalle chiamate sistema di altri thread utente e possono sfruttare il parallelismo multi-processore (o multi-core). Il problema è che la creazione di un thread è più lenta e il numero di thread è limitato dal sistema operativo.
++ **Many-to-Many**: molti thread utente sono mappati su un numero di thread kernel minore. Questo tipo di gestione è molto flessibile, ma è molto complessa da implementare.
+
+C'è anche la possibilità di creare un modello ibrido a due livelli: simile al modello many-to-many, eccetto che permette a un thread utente di essere gestito anche da un solo thread kernel.
+
+Le problematiche dei thread sono legate a tre aspetti: Chiamate fork e exec, terminazione dei thread e i dati specifici del thread.
+
+Come abbiamo visto, la chiamata di sistema fork() effettua una copia del processo padre, creando un processo figlio. Se la chiamata viene effettuata su un thread all'interno di un processo multi-thread, nel caso di linux, viene copiato solo il thread che ha effettuato la chiamata, ma può generare degli errori in quanto, viene fatta una copia della memoria del processo e tale copia potrebbe avvenire a metà di un'operazione di aggiornamento da parte di un altro thread lasciando la memoria in uno stato inconsistente. <br>
+Un thred può venir terminato preventivamente con due approcci gnerali: Un approccio **asincrono**, che termina immediatamente il thread, senza preoccuparsi dello stato della memoria o delle risorse...infatti può capitare che queste non vengano rilasciate; Un approccio **ritardato**, in cui il thread controlla periodicamente se deve essere terminato. <br>
+I thread condividono la memoria *globale*, ma hanno anche uno stack proprio per le variabili locali. Può essere utlie avere delle variabili globali, che siano visibili non da tutti i thread, ma solo da alcuni. Per questo esiste la **thread-local storage (TLS)**, che permette di avere delle variabili globali, visibili solo da alcuni thread. <br>
+
+### Thread in Linux
+
+In linux, i thread sono chiamati task e vengono creati tramite la chiamata di sistema **clone()** che è simile a fork(), ma permette di specificare quali risorse condividere tra i thread. Anche la fork() stessa è implementata tramite clone(). <br>
+Per gestire i thread su linux, viene usata la libreria **Pthread** (POSIX threads): una API standard e portabile per la gestione dei thread, che permette di creare, terminare, sincronizzare e comunicare tra thread. <br>
+
+### Thread in Java
+
+I thread in Java vengono gestiti dalla JVM, ma sono eseguiti dal sistema operativo. Ci sono due modi per creare un thread in Java:
+
++ estendendo la classe **Thread**: si crea una classe che estende la classe Thread e si implementa il metodo run(), che contiene il codice da eseguire. Si crea un oggetto della classe creata e si invoca il metodo start() per eseguire il thread.  Il metodo join() permette di aspettare che il thread termini l'esecuzione, genera un'eccezione InterruptedException se il thread viene interrotto tramite interrupt().
++ implementando l'interfaccia **Runnable**: si crea una classe che implementa l'interfaccia Runnable e si implementa il metodo run(), che contiene il codice da eseguire. 
+
+Per **terminare** un Thread in modo asincrono esiste il metodo **stop()**, ma è stato deprecato. La soluzione più sicura è suare il metodo **interrupt()**, che imposta il flag interrupt del thread a true. Se il thread è in attesa con sleep, join etc. viene generata un'eccezione interruptException che indica che il thread deve essere interrotto. Se invece il thread non entra mai in attesa può controllare il flag interrupt tramite il metodo **Thread.interrupted()**. A questo punto la soluzione migliore è lanciare un'eccezione InterruptException. <br>
+
+```Java
+void run(){
+  while(..){
+    //codice
+    if(Thread.interrupted()){
+      throw new InterruptException();
+    }
+  }
+}
+```
+
+
