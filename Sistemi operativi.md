@@ -711,4 +711,50 @@ void run(){
 }
 ```
 
+Un Thread può trovarsi in uno sei seguenti stati:
+
++ **NEW**: il thread è stato creato, ma non è ancora stato avviato
++ **RUNNABLE**: il thread è in esecuzione o in attesa di essere eseguito
++ **BLOCKED**: il thread è bloccato perché sta aspettando un monitor lock
++ **WAITING**: il thread è in attesa indefinita di un altro thread
++ **TIMED_WAITING**: il thread è in attesa per un tempo definito (sleep)
++ **TERMINATED**: il thread ha terminato l'esecuzione
+
+
+## Scheduling della CPU
+
+Lo scheduling della CPU permette di utlizzare la massimo le risorse della CPU, attraverso la multiprogrammazione: sfruttiamo le fasi in cui un processo è in attesa per assegnare nuovi processi alla CPU. <br>
+L'esecuzione dei processi consiste di un ciclo di esecuzione in CPU e attesa di una periferica. La fase il cui il processo lavora con il processore è detta CPU burst. Le applicazioni possono essere CPU bound (tanti processi che durano poco), oppure I/O bound (pochi processi che durano tanto).
+
+Lo **scheduler della CPU** seleziona tra i processi in memoria che sono pronti per essere eseguiti e li assegna alla CPU (*scheduling di breve durata*). Lo scheduler prende delle decisioni sul processo da assegnare alla CPU quando un processo passa: 
+
++ da running a waiting;
++ da running a ready;
++ da waiting a ready;
++ a terminated;
+
+Se lo scheduling avviene solo nel primo e ultimo caso, allora è detto **non-preemptive** (senza prelazione) o cooperativo; se invece avviene in tutti i casi, allora è detto **preemptive** (con prelazione). <br>
+La prelazione può portare a problemi di inconsistenza dei dati condivisi tra due processi/threads (**race conditions**), per questo sono necessari dei meccanismi di sincronizzazione. Tuttavia, la prelazione è molto importante, perché permette di garantire un tempo di risposta minimo per i processi interattivi e permette a processi più importanti di poter finire prima la loro esecuzione. <br>
+Quando un processo è sottoposto a prelazione, può capitare che venga interrotto durante una chiamata di sistema, avendo quindi in esecuzione il codice del kernel: per ovviare a possibili gravi problemi, alcuni sistemi operativi impediscono che un processo venga interrotto se sta eseguendo una chiamata di sistema
+
+### Dispatcher 
+
+Il modulo Dispatcher del sistema operativo dà il controllo della CPU al processo selezionato dallo scheduler. Il dispatcher deve essere il più veloce possibile, in modo da minimizzare il tempo di risposta (latenza di dispatch). <br>
+Il dispatcher deve fare le seguenti operazioni:
+
++ cambiare il contesto della CPU (context switching)
++ passare alla modalità utente
++ saltare all'indirizzo di partenza del processo selezionato oppure all'indirizzo dell'istruzione cui il processo era rimasto 
+
+### Criteri di scheduling
+
+Come già detto, l'obiettivo dello scheduling è utilizzare al massimo la CPU, tenendola il più occupata possibile. 
+
+Definiamo la **produttività** in termini di numero di processi completati per unità di tempo (throughput), che puntiamo a massimizzare. <br>
+Vogliamo invece minimizzare il **tempo di completamento** (o tempo di ritorno), ovvero il tempo necessario a eseguire un processo (turnaround time); il **tempo di attesa** e il**tempo di risposta**(response time), ovvero il tempo che intercorre tra la sottomissione di un processo e la prima risposta. <br>
+Lo scheduler della CPU incide soprattutto sul tempo di attesa. 
+
+### Scheduling First Come, First Served (FCFS)
+
+
 
