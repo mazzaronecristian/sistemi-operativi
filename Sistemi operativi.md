@@ -754,7 +754,107 @@ Definiamo la **produttività** in termini di numero di processi completati per u
 Vogliamo invece minimizzare il **tempo di completamento** (o tempo di ritorno), ovvero il tempo necessario a eseguire un processo (turnaround time); il **tempo di attesa** e il**tempo di risposta**(response time), ovvero il tempo che intercorre tra la sottomissione di un processo e la prima risposta. <br>
 Lo scheduler della CPU incide soprattutto sul tempo di attesa. 
 
-### Scheduling First Come, First Served (FCFS)
+### First Come, First Served (FCFS)
 
+Questo scheduling non prevede la prelazione. Supponiamo di avere in coda i seguenti processi: 
 
+![processi-fcfs](images/processi-fcfs.png)
 
+E supponiamo che i processi arrivino nell'ordine: *P1, P2, P3*. Il **diagramma di Gantt** per questa schedula è: 
+
+![fcfs](images/fcfs.png)
+
++ tempo di attesa: per $P1 = 0$, per $P2 = 24$, per $P3 = 27$
++ tempo medio di attesa: $17$
++ tempo medio di completamento: $(24+27+30)/3=27$
++ tempo medio di risposta: $(0+24+27)/3=17$
+
+Supponiamo invece che l'ordine di arrivo sia: *P2, P3, P1*
+
+![fcfs1](images/fcfs1.png)
+
++ tempo di attesa: per $P1 = 6$, per $P2 = 0$, per $P3 = 3$
++ tempo medio di attesa: $3$
++ tempo medio di completamento: $(3+6+30)/3=13$
++ tempo medio di risposta: $(0+3+6)/3=3$
+
+Possiamo notare che l'aver mandato in esecuzione i processi corti prima del processo lungo, ha portato a un miglioramento del tempo medio di attesa. Questo è vero in generale: chiamiamo **effetto convoglio** l'aumento del tempo di attesa dovuto all'esecuzione dei processi lunghi prima dei processi corti.
+
+### Shortest Job First (SJF)
+
+Associa a ogni processo la **lunghezza del prossimo CPU burst**. Queste lunghezze vengono usate per schedulare il processo con il minor tempo. Esistono due schemi: lo schema **non-preemptive**, ovvero che un processo non può essere schedulato prima che il corrente processo assegnato alla CPU abbia terminato il CPU burst; lo schema **preemptive**, cioè che se arriva un processo la cui lunghezza del CPU burst è inferiore al tempo rimanente al processo attualmente in esecuzione, allora questo nuovo processo viene assegnato alla CPU (Shortes Remaining Time First). L'SJF è detto **ottimale**, in quanto garantisce il minimo tempo medio di attesa per un insieme di processi fissati
+  
+![SJF-nonpreemptive](images/SJF-nonpreemptive.png)
+
+Le frecce indicano il tempo di arrivo dei vari processi
+
++ Tempo di attesa medio: $(0 + 6 + 3 + 7)/4 = 4$
+
+![SJF-preemptive](images/SJF-preemptive.png)
+
++ Tempo di attesa medio:  $(9 + 1 + 0 +2)/4 = 3$
+
+Noi non possimao determinare la lunghezza del prossimo CPU burst; possiamo solo stimarlo valutando la storia passata dell'uso della CPU da parte dei processi e cercare di fare a una previsione. Facendo una media esponenziale:
+
++ t <sub>n</sub> = lunghezza dell' n-esimo CPU burst
++ $\tau$ = valore predetto per il prossimo CPU burst  
++ $\tau$<sub>0</sub> = valore iniziale preimpostato
++ $\alpha$, $0\leq\alpha\leq1$
++ $\tau$<sub>n+1</sub>  $= \alpha t$<sub>n</sub> $+(1+\alpha)\tau$<sub>n</sub>
+
+### Scheduling con Priorità
+
+A ogni processo viene associato un numero intero, che avrà il ruolo di priorità del processo stesso. La CPU è allocata dal processo con la priorità più alta (intero più basso) e lo scheduling in questo caso, può essere sia preemptive che non. <br> 
+L'SJF è uno scheduling a priorità, dove la priorità è il tempo predetto del prossimo burst della CPU. 
+Il problema che sussiste con questi tipi di scheduling è il così detto **starvation**: processi con priorità molto bassa non vengono mai eseguiti.
+La soluzione consiste nell'incrementare la priorità al passare del tempo: **Aging** 
+
+### Round Robin (RR)
+
+In questo scheduling, ogni processo è allocato in CPU per una piccola parte di unità di tempo (time quantum, nell'ordine di 10-100 millisecondi). Dopo che questo *quanto* è trascorso, il processo viene interrotto e aggiunto alla fine della coda di ready. <br>
+Se ci sono *n* processi nella coda di ready e il quanto è *q*, allora ogni processo prende *1/n* del tempo della CPU (spartito equamente tra i processi) in parti di al massimo *q* unità di tempo alla volta. Nessun processo aspetta più di *(n-1)/q* unità di tempo. <br>
+Se *q* è grande, allora questo scheduling si comporta come lo scheduling FCFS; d'altra parte, se *q* è piccolo, il tempo di context switch aumenta.<br>
+Vediamo un esempio con *q = 20*:
+
+![RR](images/RR.png) 
+
++ Tempo di attesa medio: $(((77
+20)+(121 97))+20+(37+(97 57)+(134 117))+(57+(117 77)))/4 =
+(81 + 20 + 94 + 97) / 4 = 73$ (con SJF verrebbe 38)
+
+tipicamente si ha un tempo di completamento medio più elevato rispetto a SJF, ma si ha un miglioramento nel tempo di risposta. <br>
+Nell'esempio di sopra vengono eseguiti 9 context switch.
+
+All'aumentare del quanto, diminuisce la media del tempo di completamento.
+
+### Code multilivello
+
+Un'altro modo in cui viene gestito lo scheduling: **La coda dei processi pronti è divisa in ulteriori code separate**, per esempio:
+
++ foreground (interattivi);
++ background (batch);
+
+e ogni coda può essere gestita con un diverso algoritmo di scheduling. A questo punto il problema è fare lo scheduling tra le varie code. In che modo la CPU prende i processi dalle varie code? Lo scheduling tra le code può essere fatto con priorità (es. eseguo tutti i processi nella coda di foreground, poi quelli in background), oppure con un meccanismo di Time-Slice: ogni coda prende un certo tempo di CPU, in modo da garantire un tempo di CPU a tutti i processi. Anche in questo caso, lo scheduling con priorità può portare al problema della starvation delle code con più bassa prioirità e possiamo risolverlo con la retroazione tra le code: Un processo può passare da una coda all'altra. Nello scheduler multi livello con retroazione, dobbiamo definire i seguenti parametri:
+
++ Numero di code
++ Algoritmo di scheduling per ogni coda 
++ Metodo usato per determinare quando promuovere un processo 
++ Metodo usato per determinare quando retrocedere un processo
++ Metodo usato per determinare in quale coda un
+processo deve entrare quando il processo necessita di
+un servizio
+
+Vediamo il seguente esempio: 
+```
+Ci sono tre code:
+  Q0: RR con time quantum 8 millisecondi
+  Q1: RR con time quantum 16 millisecondi
+  Q2: FCFS
+
+Un nuovo processo entra sempre nella coda Q0. Quabdo ottiene la CPU, il lavoro riceve 8 millisecondi. Se non riesce a finire in tempo allora viene spostato nella coda Q1. 
+
+Nella coda Q1 il processo ha un quanto di 16 millisecondi e, se non riesce a concludere in tempo, viene spostato nella coda Q2, dove viene eseguito un semplice FCFS.
+
+```
+
+![multi_livello_esempio](images/muli_livello_esempio.png)
