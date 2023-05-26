@@ -952,3 +952,62 @@ All’aumentare della priorità (nice level basso) avrà un timeslice più grand
 
 Con il kernel 2.6.23 è stato riorganizzato il codice per lo scheduling ed è definita un'interfaccia per algoritmi di scheduling. QUesto permette di definire nel kernel più **classi di scheuing**, ognuna gesita con il proprio algoritmo.
 
+## Sincronizzazione tra processi
+
+L'accesso concorrente a dati condivisi può portare ad avere dei dati inconsistenti, dovuto a:
+
++ Scheduling con prelazione in monoprocessore
++ Accesso parallelo alla memoria in un'ambiente multiprocessore
+
+è necessario implementare dei meccanismi per assicurare l'esecuzione ordinata dei processi concorrenti, in modo da evitare casi inconsistenti. <br>
+Supponiamo di realizzare un **processo/ thread produttore** e un **processo/ thread consumatore** che condividono una zona di memoria per memorizzare degli elementi: viene usata una variabile condivisa **count** che tiene traccia di quanti elementi sono pronti per il consumatore; count viene incrementata dal thread produttore quando un nuovo elemento è disponibile e viene decrementata dal consumatore quando consuma l'elemento. Vediamo i thread:
+
++ Thread produttore:
+  ```C
+  while (true) {
+      nextProduced = produce();      //produce un elemento per il consumatore e lo mette in nextProduced
+      while (count == BUFFER_SIZE);
+        //non fare niente
+      buffer[in] = nextProduced;     //mette l'elemento nel buffer
+      in = (in + 1) % BUFFER_SIZE;   //incrementa l'indice
+      count++;
+  }
+  ```
++ Thread consumatore
+  ```C
+  while (true) {
+      while (count == 0);
+        //non fare niente
+      nextConsumed = buffer[out];    //prende l'elemento dal buffer
+      out = (out + 1) % BUFFER_SIZE; //incrementa l'indice
+      count--;
+      consume(nextConsumed);         //consuma l'elemento
+  }
+  ```
+
+**count++** potrebbe essere implementato così:
+
++ ```assembly
+  register1 = count;
+  register1 = register1 + 1;
+  count = register1;
+  ```
+
+e **count--** potrebbe essere implementato così:
+
++ ```assembly
+    register1 = count;
+    register1 = register1 - 1;
+    count = register1;
+  ```
+
+Se le singole operazioni che compongono count++ e count-- non sono atomiche, potrebbe capitare che il valore di count non sia quello atteso. <br>
+Le istruzioni count++ e count-- sono dette **sezini critiche** dei due thread e portano a delle situazioni di **Race Condition**: il risultato finale dipende dall'ordine di esecuzione delle istruzioni. In generale si ha una race condition quando vengono eseguite operazioni di lettura e scrittura di un dato condiviso da più thread.
+
+Vediamo le proprietà delle sezioni critiche:
+
++ *Mutua esclusione*: Se il processo *P<sub>i</sub>* è in esecuzione nella sua sezione critica, allora nessun altro processo può essere in esecuzione nella sua sezione critica;
++ *Progresso*: Se nessun processo è nella sua sezione critica e esistono processi che vogliono entrarvi, allora la scelta dal processo che può entrare nella sezione critica non può essere rimandata indefinitamente;
++ *Attesa limitata*: Deve esistere un limite al numero di volte che altri processi possono entrare nella sezione critica dopo che un processo ha richiesto di entrare nella sezione critica e prima che questa richiesta venga soddisfatta:
+  + Assume che ogni processo venga eseguito a velocità non nulla
+  + Nessuna assunzione sulla velocità relativa degli N processi 
