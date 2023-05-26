@@ -1011,3 +1011,75 @@ Vediamo le proprietà delle sezioni critiche:
 + *Attesa limitata*: Deve esistere un limite al numero di volte che altri processi possono entrare nella sezione critica dopo che un processo ha richiesto di entrare nella sezione critica e prima che questa richiesta venga soddisfatta:
   + Assume che ogni processo venga eseguito a velocità non nulla
   + Nessuna assunzione sulla velocità relativa degli N processi 
+
+### Soluzione di Peterson
+
+La soluzione di Peterson è una soluzione software utlizzabile solo per due processi. <br>
+Si assume che le operazioni di LOAD e STORE siano atomiche.
+I due processi condividono due variabili:
+
++ int **turn**: indica il processo che può entrare nella sezione critica
++ bool **flag[2]**: indica se il processo vuole entrare nella sezione critica
+
+```C
+//processo 0
+do {
+    flag[0] = true;
+    turn = 1;
+    while (flag[1] && turn == 1);
+        //non fare niente (aspetta che il processo 1 finisca)
+    //sezione critica
+    flag[0] = false;
+    //sezione non critica
+} while (true);
+
+//processo 1
+do {
+    flag[1] = true;
+    turn = 0;
+    while (flag[0] && turn == 0);
+        //non fare niente (aspetta che il processo 0 finisca)
+    //sezione critica
+    flag[1] = false;
+    //sezione non critica
+} while (true);
+```
+
+La mutua esclusione è garantita, perché se entrambi i processi fossero nella sezione critica avremmo che flag[0] = flag[1] = true e turn = 0 = 1, ma questo è impossibile. <br>
+Il progresso è garantito, perché se uno dei due processi vuole entrare nella sezione critica sicuramente uno dei due entra (dipende dal valore di turn).<br>
+Dopo che P<sub>0</sub> è entrato e P<sub>1</sub> è in attesa, se P<sub>0</sub> richiede nuovamente di entrare allora viene prima sbloccato P<sub>1</sub> e poi verrà gestito P<sub>0</sub>... quindi anche l'attesa limitata è garantita.
+
+### Algoritmo del Fornaio (Lamport)
+
+Questa è una soluzione più generale, per N processi. L'idea è gestire i thread come se fossero dei clienti in fila, in attesa: Un thread prende un numero e poi aspetta che il suo numero sia il prossimo da servire, ovvero il più piccolo. <br>
+Sono usati due vettori di N elementi condivisi tra gli N processi:
++ int **number[N]**: contiene i numeri "presi" dai processi per entrare nella sezione critica (0 se il processo non vuole ci vuole entrare)
++ bool **choosing[N]**: indica che il processo è in fase di scelta del numero
+
+```C
+process P(i){
+  do {
+    choosing[i] = true;
+    number[i] = max(number[0], ..., number[N-1]) + 1;
+    choosing[i] = false;
+    for (j = 0; j < N; j++) {
+        while (choosing[j]);
+        while (number[j] != 0 && (number[j] < number[i] || (number[j] == number[i] && j < i)));
+    }
+    //sezione critica
+    number[i] = 0;
+    //sezione non critica
+  } while (true);
+}
+```
+
+Nella fase di scelta del numero due o più processi ossono prendere lo stesso numero. In questo caso verrà scelto il processo con l'indice più piccolo. <br>
+
+ >N.B: (number[j] < number[i] || (number[j] == number[i] && j < i)) corrisponde a (number[j], j) < (number[i], i) in ordine lessicografico. Per comodità useremo questa seconda sintassi
+
+La mutua esclusione è garantita, perché se due processi x e y fossero entrambi nella sezione critica si avrebbe *(number[x], x) < (number[y], y)* e *(number[y], y) < (number[x], x)*, ma questo è impossibile. <br>
+Il progresso è garantito, perché se nessuno è nella sezione critca e più processi vogliono entrare, allora sicuramente uno dei processi entrerà. <br>
+Anche l'attesa limitata è garantita: i valori di *number[]* aumentano sempre, quindi se un processo è in attesa prima o poi il suo numero sarà il più piccolo e quindi entrerà nella sezione critica.
+
+
+
