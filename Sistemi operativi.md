@@ -845,16 +845,110 @@ processo deve entrare quando il processo necessita di
 un servizio
 
 Vediamo il seguente esempio: 
-```
-Ci sono tre code:
-  Q0: RR con time quantum 8 millisecondi
-  Q1: RR con time quantum 16 millisecondi
-  Q2: FCFS
+  ```
+  Ci sono tre code:
+    Q0: RR con time quantum 8 millisecondi
+    Q1: RR con time quantum 16 millisecondi
+    Q2: FCFS
 
-Un nuovo processo entra sempre nella coda Q0. Quabdo ottiene la CPU, il lavoro riceve 8 millisecondi. Se non riesce a finire in tempo allora viene spostato nella coda Q1. 
+  Un nuovo processo entra sempre nella coda Q0. Quabdo ottiene la CPU, il lavoro riceve 8 millisecondi. Se non riesce a finire in tempo allora viene spostato nella coda Q1. 
 
-Nella coda Q1 il processo ha un quanto di 16 millisecondi e, se non riesce a concludere in tempo, viene spostato nella coda Q2, dove viene eseguito un semplice FCFS.
+  Nella coda Q1 il processo ha un quanto di 16 millisecondi e, se non riesce a concludere in tempo, viene spostato nella coda Q2, dove viene eseguito un semplice FCFS.
 
-```
+  ```
 
-![multi_livello_esempio](images/muli_livello_esempio.png)
+  ![multi_livello_esempio](images/muli_livello_esempio.png)
+
+### Paramertri della CPU
+
+I parametri che ci interessano sono:
+
++ Percentuale CPU usata: viene stabilito un intervallo temporale e viene calcolata la percentuale di questo tempo la CPU (o le CPU) è usata. E' facile dividere la percentuale tra i processi, per capire chi è che sta stressando maggiormente la CPU;
++ Carico medio CPU: Il carico medio della CPU è usato in ambienti UNIX per indicare il carico del sistema e quindi la sua capacità di eseguire i processi in modo regolare senza eccessivi ritardi
+
+### Scheduling di Linux
+
+Linux è un kernel open source, che permette di create sistemi molto eterogenei. Gli obiettivi di linux sono:
+
++ Timesharing
++ gestione dinaminca della priorità
++ gestione dei processi in tempo reale
++ evitare la starvation 
++ mantenere tempi brevi di risposta
++ throughput (prcessi completati per unità di tempo) elevato per processi in background: i processi in background non rimangono troppo indietro rispetto a quelli in foreground
+
+prevede uno scheduling con prelazione sul codice utente; il codice kernel supporta la prelazione solo da versioni recenti di linux (kernel 2.6): una chiamata di sistema doveva arrivare a un punto in cui fosse sicuro interromperla. 
+
+All'inizio, il kernel integrava uno scheduler basato su epoche, ovvero un processo poteva essere eseguito per un certo periodo di tempo, dopodichè veniva messo in coda e veniva eseguito un altro processo. Questo sistema era molto semplice, ma non permetteva di gestire i processi in modo dinamico. Il tempo per scegliere un processo da mandare in esecuzione dipendeva dal numero di processi in coda($O(n)$). Nel 2013, e stato introdotto uno scheduler Earlied Deadline First (EDF) per task periodci 
+  
+### Scheduling linux/POSIX
+
+Linux segue la specifica **POSIX** riguardo allo scheduling, che si basa su una priorità statica e una dinamica (che viene calcolata in base alla priorità statica). La priorità statica è un numero intero tra 1 e 99, dove 99 è la priorità più alta, ed è usata per lo scheduling dei tast (soft) real-time. I task a priorità statica essere schedulati in due modi: 
+
++ **Scheduling FIFO**: quanto di tempo illimitato. Un processo lascia la CPU solo se si blocca in attesa di una risorsa I/O, se termina o se arriva un processo con più alta priorità 
++ **Scheduling RR**
+
+Se un processo della coda FIFO entra in loop infinito sulla (unica) CPU, il sistema può bloccarsi. <br>
+Per i task normali viene usata la priorità statica 0 e sono schedulati secondo la politca OTHER/NORMAL, nella quale i task hanno priorità dinamica   
+
+### Scheduling kernel 2.4, basato su epoche
+
+I task a priorità statica 0 vengono schedulati con una politica basata su epoche: A ogni processo è assegnato un quanto di tempo, consumato durante l'epoca; la priorità dinamica è legata alla lunghezza del quanto. Quando tutti i task della coda di ready hanno terminato il proprio quanto, l'epoca è finita è vengono ricalcolati i quanti di tempo per l'epoca successiva, aumentando (della metà di quanto rimasto precedentemente) se il processo non ha terminato il proprio quanto, favorendo in questo modo i proessi interattivi o con I/O bound. Il task può variare il proprio quanto (e quindi la propria priorità), attraverso il valore **nice** [-20,19] dove i valori negativi aumentano la priorità. Per decidere il task da mandare in esecuzione viene fatta una scansione di tutti i processi nella coda di ready; questo rende molto lento lo scheduling ($O(n)$). <br>
+Tutte le CPU accedono a un'unica coda di ready, quindi non possono accedervi contemporaneamente. 
+
+### Scheduler O(1)
+
+Questo sistema riduce il tempo di scelta del task da mandare in esecuzione (su N task) a un tempo costante, usando una tabella di hashing. <br>
+Sono previsti 140 livelli di priorità, in cui il livello 0 è quello più alto e sono organizzati in questo modo:
+
++ 0-99 per i task real-time
++ 100-139 per i task normali (120+nice)
+
+Per ogni livello di priorità, esistono due code: una per i task con quanto di tempo non esaurito (ACTIVE) e una per i task con quanto esaurito (EXPIRED).
+
+![active-expired](images/active-expired.png)
+
+Lo scheduler sceglie i task in tesa alla coda a priorità più alta dalla lista ACTIVE; quando ha terminato il quanto viene messa nella corrispondente coda della lista EXPIRED. Quando la coda ACTIVE è vuota, lo scheduler scambia le due liste. <br>
+Trovare la priorità per cui esiste almeno un task attivo si fa in tempo costante rispetto al numero di task totale: $O(1)$
+
+Può capitare che un task a bassa priorità non venga mai eseguita se ci sono sempre task a priorità più alta, casusando uno starvation. Per ovviare a questo problema, i task I/O bound vengono premiati e quelli CPU bound vengono penalizzati, con un incremento o decremento della priorità in un range di 5 livelli. La promozione è basata sul calcolo **sleep_avg** del task:
+
++ Incrementato del tempo in cui è stato in sleep, fino a un massimo 
++ decrementato del tempo in cui ha usato la CPU
+
+Il bonus non può far passare i task non real time sopra la priorità 100. <br>
+Esistono altri bonus, chiamati interactivity credits, che servono per evitare che un task I/O bound venga penalizzato troppo se esegue un'operazione di I/O molto lunga.
+
+In questo caso Ogni CPU ha la sua coda dei processi, i quali vengono spostati per bilanciare il carico delle CPU.
+
+C'è da dire che gestire tutte le euristiche dei bonus è complicato. Per questo motivo è stato introdotto il CFS (Completely Fair Scheduler).
+
+### Completely Fair Scheduler (CFS)
+
+A ogni task (non real time) è associato un **virtual_runtime**, che identifica il tempo di uso della CPU. Per decidere quale task nella coda di ready allocare, viene selezionato il task con il minor virtual_runtime. <br>
+I task sono organizzati in un albero rosso-nero, in cui ogni nodo rappresenta un task, identificato dal proprio virtual_runtime: 
+
+![cfs-virtual_runtime](images/cfs-virtual_runtime.png)
+
+Questo garantisce un tempo di scelta del task pari a $O(log(n))$, dove n è il numero di task nella coda di ready. <br>
+
+Il virtual_runtime viene aggiornato sulla base del nice value del task (priorità statica). Il tempo effettivo di CPU viene moltiplicato per $1.25$<sup>nice</sup>:
+
++ CPU più veloce per task ad alta priorità (nice = -20)
++ CPU più lenta per task a bassa priorità (nice = 19)
+
+Un task viene selezionato ed eseguito, quando verrà fermato verrà aggiornato il suo virtual_runtime e se entra nella coda ready viene inserito nell'albero RB. <br>
+I task I/O bound tendono ad usare poca CPU e quindi tendono ad
+essere selezionati prima di quelli CPU bound. <br>
+Anche il quanto di tempo assegnato dipende dal valore di nice del task: weight = $1024 / (1.25)$<sup>nice</sup>. <br>
+Il quanto viene calcolato sulla base di tutti gli weight dei task nella coda di ready:
+
++ **scheduling_period** = $max (n * sched_min_granularity_ns ,sched_latency_ns)$
++ **time_slce**(T<sub>k</sub>) = $scheduling_period * weight / total_weight$
+
+All’aumentare della priorità (nice level basso) avrà un timeslice più grande rispetto agli altri task.
+
+### Classi di Scheduling
+
+Con il kernel 2.6.23 è stato riorganizzato il codice per lo scheduling ed è definita un'interfaccia per algoritmi di scheduling. QUesto permette di definire nel kernel più **classi di scheuing**, ognuna gesita con il proprio algoritmo.
+
