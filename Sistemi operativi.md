@@ -1226,19 +1226,21 @@ typedef struct {
 } semaphore;
 
 wait(S) {
-  S--;
+  S->value--;
   if (S < 0) {
     //aggiunge il processo alla coda S->list
     block();
   }
 }
 signal(S) {
-  S++;
+  S->value++;
   if (S <= 0) {
     //estrae un processo P dalla coda S->list
     wakeup(P);
   }
 }
+
+/*devono essere eseguite in sezione critica (o disabilitando le interruzioni in monoprocessore o usando uno spinlock in multiprocessore)*/
 ```
 
 Vediamo alcuni problemi dovuti all'implementazione dei semafori: 
@@ -1249,9 +1251,142 @@ Vediamo alcuni problemi dovuti all'implementazione dei semafori:
 
   Se il processo P<sub>1</sub> esegue wait(S) e il processo P<sub>2</sub> esegue wait(Q), allora entrambi i processi si bloccano e non possono più essere eseguiti. <br>
 + **Attesa indefinita (starvation)**: un processo può non essere mai rimosso dalla coda di un semaforo dove è sospeso. Può accadere per esempio se la coda di attesa è gestita come LIFO
-+ **inversione della priorità**: si ha quando un processo H ad alta priorità è in attesa di una risorsa R posseduta da un processo L a bassa priorità, che viene prelazionato da un processo a media priorità M (< H); M blocca L ma, in modo indiretto, blocca anche H
++ **inversione della priorità**: si ha quando un processo H ad alta priorità è in attesa di una risorsa R posseduta da un processo L a bassa priorità, che viene prelazionato (interrotto e estratto dalla CPU) da un processo a media priorità M (< H); M blocca L ma, in modo indiretto, blocca anche H
   
   ![inversione-priorità](images/inversione-priorità.png)
   
   M ritarda il rilascio della risorsa R, perché ha una priorità più alta di L e quindi ritarda anche l'esecuzione di H, nonostante abbia priorità più bassa. <br>
   Una possibile soluzione consiste nell'aumentare la priorità di L portandola allo stesso livello di H (solo durante l'attesa di H) in modo che altri processi non possano fare prelazione su processo L e possa velocemente terminare l'utilizzo della risorsa R. Questo metodo è detto **protocollo di ereditarietà delle priorità**.
+
+### Problema Produttori e consumatori con memoria limitata
+
+Il problema dei produttori e consumatori è un problema classico di sincronizzazione tra processi: abbiamo più thread (i Produttori) che vogliono inserire i dati in un buffer (una coda) limitato e più thread (i Consumatori) che vogliono prelevare i dati dal buffer. <br>
+I produttori dovranno aspettare nel caso in cui il buffer sia pieno. Viceversa, i Consumatori aseetteranno nel caso in cui il buffer sia vuoto
+
+![produttori-consumatori](images/produttori-consumatori.png)
+
+Il problema è composto dai seguenti elementi:
+
++ **Buffer** di N elementi
++ Semaforo **mutex** inizializzato a 1: serve a gestire la mutua esclusione per l'accesso al buffer
++ Semaforo **empty** inizializzato a N: indica il numero di posizioni libere nel buffer
++ Semaforo **full** inizializzato a 0: indica il numero di posizioni occupate nel buffer
+
+Vediamo la struttura del processo **Produttore**:
+```C 
+do {
+  //produce un elemento
+  wait(empty);    //decrementa il numero di posizioni libere, aspetta se <=0
+  wait(mutex);    //evita l'accesso concorrente da parte di Prod. e Cons.
+
+  //aggiunge un elemento al buffer
+
+  signal(mutex);
+  signal(full);   //incrementa il numero di posizioni occupate e sveglia l'eventuale Cons.
+
+} while (true);
+```
+
+Vediamo la struttura del processo **Consumatore**:
+```C
+do {
+  wait(full);     //decrementa il numero di posizioni occupate, aspetta se <=0
+  wait(mutex);    //evita l'accesso concorrente da parte di Prod. e Cons.
+
+  //preleva un elemento dal buffer
+
+  signal(mutex);
+  signal(empty);  //incrementa il numero di posizioni libere e sveglia l'eventuale Prod.
+
+  //consuma l'elemento
+
+} while (true);
+```
+
+Il Produttore aspetta che si liberi almeno una posizione nel buffer per poter caricare il suo dato; appena è il suo turno pone mutex a 0, per evitare che il consumatore acceda contemporaneamente al buffer e quindi avere una incongruenza dei dati; appena il Produttore finisce di caricare i propri dati, asserisce mutex e incrementa il numero di posizioni piene nel buffer. <br>
+Un consumatore in attesa che il semaforo full sia >0 a questo punto verrà "svegliato" e potrà accedere al buffer. Il consumatore asserisce mutex e decrementa il numero di posizioni piene nel buffer; successivamente consuma il dato (fuori dalla sezione critica).
+
+### Problema dei lettori e scrittori
+
+Un insieme di dati è condiviso tra processi concorrenti: i Lettori, che leggono i dati e non effetuano modifiche; gli Scrittori, che leggono e scrivono i dati. <br>
+Il problema permette a più lettori di leggere contemporaneamente i dati, ma permette a un solo scrittore di modificarli. <br>
+L'insieme di dati condivisi è composto da:
++ **Dati**: dati condivisi tra i processi
++ semaforo **mutex** inizializzato a 1
++ Semaforo **scrittura** inizializzato a 1: indica se la scrittura può essere effettuata o meno
++ intero **nLettori** inizializzato a 0: indica il numero di lettori che stanno leggendo in questo momento
+
+Struttura dei processi Scrittori:
+  
+  ```C
+  do {
+    wait(scrittura);    //aspetta che nessun altro processo stia scrivendo
+    //esegue lettura e scrittura
+    signal(scrittura);  //porta scrittura a 1
+  } while (true);
+  ```
+
+Struttura dei processi Lettori:
+  
+  ```C
+  do {
+    wait(mutex);        //evita l'accesso concorrente da parte di lettori (solo un
+    nLettori++;         //lettore alla volta può incrementare nLettori)
+
+    if (nLettori == 1)  //se è il primo lettore
+      wait(scrittura);  //aspetta nel caso ci sia una scrittura altrimenti la inibisce
+
+    signal(mutex);      
+
+    //esegue lettura
+    
+    wait(mutex);
+    nLettori--;         //decrementa il numero di lettori
+    if (nLettori == 0)
+      signal(scrittura);  //porta scrittura a 1 se non ci sono lettori attivi
+    signal(mutex);
+  } while (true);
+  ```
+Se non mettessi l'accesso esclusivo alla prima parte di codice, allora avrei una incongruenza nel dato nLettori (analogo per la parte finale). <br>
+Il problema di questa soluzione è che potrei avere delle **attese indefinite degli scrittori**
+
+### Problema dei 5 filosofi
+
+Il problema dei 5 filosofi è un problema classico di sincronizzazione tra processi: abbiamo 5 filosofi che devono mangiare, ma possono mangiare solo se hanno entrambe le bacchette (come fai a mangiare il riso con solo una bacchetta?!). <br>
+
+![5-filosofi](images/5-filosofi.png)
+
+Quindi un filosofo deve aspettare di avere a disposizione entrambe le bacche che ha ai lati. Vediamo i dati condivisi:
++ Piatto di riso centrale
++ Semafori **bacchette[5]** inizializzati a 1: indica se la bacchetta è disponibile o meno.
+
+Struttura del filosofo i:
+```C
+do {
+  wait(bacchette[i]);           //aspetta che la bacchetta di sinistra sia disponibile
+  wait(bacchette[(i+1)%5]);     //aspetta che la bacchetta di destra sia disponibile
+
+  //mangia
+  
+  signal(bacchette[i]);         //rilascia la bacchetta di sinistra
+  signal(bacchette[(i+1)%5]);   //rilascia la bacchetta di destra
+
+  //pensa
+
+} while (true);
+```
+***Problema***: i processi entrano in **stallo** se tentano di prendere entrambe le bacchette (di mangiare) contemporaneamente.
+
+### Problemi con i semafori
+
+I semafori sono un meccanismo di sincronizzazione molto potente, ma possono essere usati in modo errato. Ecco alcuni usi scorretti delle istruzioni wait e signal:
+
++ signal(mutex) ... wait(mutex): invertire l'ordine delle istruzioni porta ad avere più processi in sezione critica contemporaneamente
++ wait(mutex) ... wait(mutex): un processo può bloccarsi su un semaforo che non verrà mai sbloccato (situazione di stallo)
++ Omissione di wait(mutex) o signal(mutex): può portare a situazioni di stallo o a inconsistenze dei dati (più processi in sezione critica)
+
+Un altro uso scorretto è il seguente:
+
+![errori-semafori](images/errori-semafori.png)
+
+I problemi di sincronizzazione dovuti a un errato uso dei semafori sono molto difficili da individuare, in quanto si possono anche verificare solo in rare occasioni e difficilmente riproducibili. <br>
