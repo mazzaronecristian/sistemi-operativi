@@ -1081,5 +1081,177 @@ La mutua esclusione è garantita, perché se due processi x e y fossero entrambi
 Il progresso è garantito, perché se nessuno è nella sezione critca e più processi vogliono entrare, allora sicuramente uno dei processi entrerà. <br>
 Anche l'attesa limitata è garantita: i valori di *number[]* aumentano sempre, quindi se un processo è in attesa prima o poi il suo numero sarà il più piccolo e quindi entrerà nella sezione critica.
 
+Nei sistemi moderni è preferibile agire a livello Hardware per la sincronizzazione dei processi. Nei sistemi monoprocessore, per esempio, è possibile abilitare e disabilitare le interruzioni durante l'esecuzione di una sezione critica. Questo metodo però non è efficiente nei sistemi multiprocessore, in quanto andremmo a bloccare tutte le CPU. <br>
+Per i sistemi multiprocessore (sistemi più moderni), si usano le **istruzioni atomiche**, ovvero non possono essere interrotte da altri processi. Ne esistono di due tipi: 
 
++ Controllano il valore e lo impostano 
++ Scambiano il contenuto di due parole di memoria
 
+### Istruzione di TestAndSet
+
+Istruzione che legge il valore di una variabile e la imposta. E' eseguita sul processore senza essere interrotta 
+
+```C
+TestAndSet (bool *target) {
+    bool rv = *target;
+    *target = true;
+    return rv;
+}
+```
+
+Vediamo una soluzione usando questa istruzione:
+
+```C
+bool lock = false;
+do {
+    while (TestAndSet(&lock));
+    //sezione critica
+    lock = false;
+    //sezione non critica
+} while (true);
+```
+La variabile **lock** è condivisa tra i processi e viene usata per indicare se un processo è nella sezione critica o meno. TestAndSet(&lock) legge il valore di lock e lo mette a true, ritornando il valore precedente. Se il valore precedente era false, allora il processo può entrare nella sezione critica. Solo un processo troverà lock a false. Il problema di questa istruzione è che non garantisce tutte le proprietà delle sezioni critiche: non garantisce l'attesa limitata, perché un processo potrebbe essere sempre interrotto da un altro processo che ha la priorità più alta e con una sezione critica molto piccola. <br>
+
+### Istruzione di Swap
+
+Scambia il contenuto di due parole di memoria. E' eseguita sul processore senza essere interrotta 
+
+```C
+Swap (bool *a, bool *b) {
+    bool temp = *a;
+    *a = *b;
+    *b = temp;
+}
+```
+
+Vediamo una soluzione con questa istruzione:
+
+```C
+bool lock = false;
+do {
+    key = true;
+    while (key == true)
+      Swap(&lock, &key);
+    //sezione critica
+    lock = false;
+    //sezione non critica
+} while (true);
+```
+
+lock è una variabile condivisa; ogni procsso ha una variabile locale key. Anche in questo caso, non è garantita l'attesa limitata. <br>
+
+In entrambi i casi, sono garantite la mutua esclusione e il progresso, ma non l'attesa limitata. Quindi vediamo una soluzione:
+
+```C
+bool lock = false;
+do{
+  waiting[i] = true;
+  key = true;
+  while (waiting[i] && key)
+    key = TestAndSet(&lock);  //intercambiabile con Swap(&lock, &key)
+  //sezione critica
+  j = (i + 1) % n;
+  while ((j != i) && !waiting[j])
+    j = (j + 1) % n;
+  if (j == i)                 //nessuno in attesa
+    lock = false;
+  else
+    waiting[j] = false;       //lo sblocca e lo fa entrare nella sezione critica
+  //sezione non critica
+}
+```
+
+waiting[i] indica se il processo P<sub>i</sub> vuole entrare nella sezione critica (inizializzato a false).
+while ((j != i) && !waiting[j]) cerca il prossimo processo che è in attesa sul lock, seguendo l'ordine dei processi. Se trova un processo che è in attesa allora lo sblocca. Questo garantisce un tempo di attesa massimo di n-1 cicli di while. <br>
+
+Le soluzioni viste finora sono dette ad **attesa attiva** (o **busy waiting**), in quanto usano la CPU per controllare ripetutamente il valore di una o più variabili. Questo diventa un problema quando i processi iniziano a avere sezioni critiche massicce; è preferibile quindi optare per un'altra soluzione: Il sistema operativo in genere fornisce delle primitive di sistema per la realizzazione di sezioni critiche, in genere chiamate **mutex** (mutual exclusion) e implementano un meccanismo di attesa passiva (per esempio pongono il processo in attesa di una coda). <br>
+In alcuni casi è comunque conveniente usare le attese attive, per esempio quando la sezione critica è molto piccola e il tempo per il context switch è maggiore del tempo di attesa. Il sistema operativo quindi fornisce anche gil **spinlock**, che implementano l'attesa attiva.
+
+### Semafori
+
+I semafori sono un modo per implementare i mutex. Sono strumenti di sincronizzazione tra processi, che permettono di risolvere il problema delle sezioni critiche. <br>
+Il semaforo S è una variabile intera, sulla quale sono possibili due operazioni:
+
++ wait(S)
++ signal(S)
+
+```C
+wait(S) {
+  while (S <= 0);
+  S--;
+}
+signal(S){
+  S++;
+}
+```
+Sono istruzioni indivisibili e sono l'unico modo per interagire con un semaforo. <br>
+Esistono due tipi di semafori:
++ semaforo contatore: valore intero non vincolato
++ semaforo binario: valore intero vincolato a 0 e 1, conosciuti come mutex lock
+
+un semaforo binario fornisce la mutua escluzione ed è implementabile con un semaforo contatore:
+
+```C
+Semaforo mutex = 1;
+wait(mutex);
+//sezione critica
+signal(mutex);
+```
+#### Uso
+
+I semafori contatore si possono usare er regolare l'accesso a un numero n di risorse che vengono usate singolarmente:
++ si inizializza S a n
++ si usa wait(S) prima di usare una risorsa, se le risorse sono terminate (S==0) il processo entra in attesa
++ si usa signal(S) quando si rilascia la risorsa, che incrementa S e se qualche thread era bloccato in attesa di una risorsa, ora può continuare
+
+I semafori possono anche essere usati per sincronizzare l'esecuzione tra processi: immaginiamo di volere che l'esecuzione di **S1** di Thread1 avvenga prima di **S2** di Thread2. In questo caso si usa un semaforo binario synch inizializzato a 0:
+
+![semafoti-sincronizazione](images/semafori-sincronizzazione.png)
+
+#### Implementazione
+
+L'implementazione dei semafori deve garantire che due processi non possano eseguire wait e signal contemporaneamente sullo stesso semaforo. <br>
+Notiamo che anche in questo caso la wait() implementa un'attesa attiva attraverso un ciclo while e questo comunque non va bene, perché le applicazioni possono passare molto tempo nelle sezioni critiche e quindi l'attesa attiva diventa inefficiente. 
+
+Una soluzione è quella di associare a ogni semaforo una coda di attesa, aggiungendo due nuove operazioni:
+
++ **block()**: inserisce il processo che la invoca in una coda di attesa; tale processo non entrarà più nella coda di ready e quindi non sarà eseguito.
++ **wakeup()**: estrae un processo dalla coda di attesa e lo inserisce nella coda di ready
+
+```C
+//nuova implementazione di un semaforo attraverso una struttra dati 
+typedef struct {
+  int value;
+  struct process *list;
+} semaphore;
+
+wait(S) {
+  S--;
+  if (S < 0) {
+    //aggiunge il processo alla coda S->list
+    block();
+  }
+}
+signal(S) {
+  S++;
+  if (S <= 0) {
+    //estrae un processo P dalla coda S->list
+    wakeup(P);
+  }
+}
+```
+
+Vediamo alcuni problemi dovuti all'implementazione dei semafori: 
+
++ **Stallo (deadlock)**: situazione in cui due o più processi aspettano indefinitivamente un evento ch può essere causato solo da uno dei processi in attesa. Si bloccano a vicenda. Supposiamo di avere due semafori S e Q, entrambi inizializzati a 1:
+  
+  ![stallo](images/stallo.png)
+
+  Se il processo P<sub>1</sub> esegue wait(S) e il processo P<sub>2</sub> esegue wait(Q), allora entrambi i processi si bloccano e non possono più essere eseguiti. <br>
++ **Attesa indefinita (starvation)**: un processo può non essere mai rimosso dalla coda di un semaforo dove è sospeso. Può accadere per esempio se la coda di attesa è gestita come LIFO
++ **inversione della priorità**: si ha quando un processo H ad alta priorità è in attesa di una risorsa R posseduta da un processo L a bassa priorità, che viene prelazionato da un processo a media priorità M (< H); M blocca L ma, in modo indiretto, blocca anche H
+  
+  ![inversione-priorità](images/inversione-priorità.png)
+  
+  M ritarda il rilascio della risorsa R, perché ha una priorità più alta di L e quindi ritarda anche l'esecuzione di H, nonostante abbia priorità più bassa. <br>
+  Una possibile soluzione consiste nell'aumentare la priorità di L portandola allo stesso livello di H (solo durante l'attesa di H) in modo che altri processi non possano fare prelazione su processo L e possa velocemente terminare l'utilizzo della risorsa R. Questo metodo è detto **protocollo di ereditarietà delle priorità**.
