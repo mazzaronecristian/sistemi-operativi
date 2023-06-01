@@ -1390,3 +1390,123 @@ Un altro uso scorretto è il seguente:
 ![errori-semafori](images/errori-semafori.png)
 
 I problemi di sincronizzazione dovuti a un errato uso dei semafori sono molto difficili da individuare, in quanto si possono anche verificare solo in rare occasioni e difficilmente riproducibili. <br>
+
+### Monitor
+
+I monitor sono una astrazione di alto livello che fornisce un meccanismo conveniente ed efficiente per la sincronizzazione tra processi: **solo un processo per volta può essere attivo all'interno di un monitor**. <br>
+
+```C
+monitor M {
+  //dichiarazione di variabili e procedure
+  procedure P1(...) {
+    //corpo della procedura
+  }
+  procedure P2(...) {
+    //corpo della procedura
+  }
+  ...
+  procedure Pn(...) {
+    //corpo della procedura
+  }
+  initialization code{
+    //inizializzazione delle variabili
+  }
+}
+```
+A differenza dei semafori, i monitor sono implementati dai linguaggi e non dai sistemi operativi
+
+![monitor](images/monitor.png)
+
+All'interno del Monitor sono dichiarere le variabili di tipo condizione: "condition x;". Ognuna di queste varabili rappresenta una **coda** in cui i processi si sospendono.<br>
+Su di esse sono definite due operazioni:
+
++ **x.wait()**: il processo che invoca questa istruzione viene sospeso, indroducentolo nello coda individuata da x; il monitor viene liberato. Al risveglio, il processo riprende l’esecuzione mutamente esclusiva all’interno del monitor.
++ **x.signal()**: rende attivo un processo in attesa nella coda individuata dalla variabile x; se non vi sono processi in coda, non produce effetti.
+
+Quando viene eseguita la signal, entrambi i processi coinvolti potrebbero continuare l'esecuzione, ma solo uno può entrare nel monitor. E' scelta dell'implementazione decidere a chi dara l'accesso dopo la signal.
+
+![variabili-condizionali](images/variabili-condizionali.png)
+
+Vediamo una soluzione per i 5 filosofi:
+  
+```C
+monitor filosofi{
+  enum {PENSANDO, AFFAMATO, MANGIANDO} stato[5];
+  condition c[5];
+
+  void prendi(int i){
+    stato[i] = AFFAMATO;
+    verifica(i);
+    if(stato[i] != MANGIANDO)
+      c[i].wait();
+  }
+
+  void lascia(int i){
+    stato[i] = PENSA;
+    //controllo filosofi vicini a destra e a sinistra
+    verifica((i+4)%5);
+    verifica((i+1)%5);
+  }
+
+  void verifica(int i){
+    if(stato[(1+4)%5]!=MANGIANDO && stato[i]==AFFAMATO && stato[(i+1)%5]!=MANGIANDO){
+      stato[i] = MANGIANDO;
+      c[i].signal();
+    }
+  }
+
+  initialization_code{
+    for(int i = 0; i < 5; i++)
+      stato[i] = PENSANDO;
+  }
+}
+
+
+monitor filosofi cf;
+
+process filosofo(i){
+ do {
+  // pensa
+  cf.prendi(i);
+  // mangia
+  cf.lascia(i);
+} while (true);
+}
+```
+
+I monitor può essere implementato con i semafori: Un mutex viene usato per garantire l'accesso esclusivo al monitor e ogni procedura F del monitor diventa:
+
+```C
+wait(mutex);
+...
+body of F
+...
+
+if (next_count > 0)   //
+  signal(next);       // rilascia il monitor
+else                  //
+  signal(mutex);      //
+```
+
+Il semaforo next e il contatore next_count (inizializzati a 0) servono a garantire l'accesso al monitor da un solo processo nel caso di una signal su una condizione. Ridefiniamo anche wait e signal:
+
+```C
+Wait:
+  x_count ++;           //incrementa il numero di thread in attesa su x
+  if (next_count > 0)   //se c'è un thread che ha fatto signal, il monitor lo sveglia
+    signal(next);
+  else                  //altrimenti sblocca il mutex
+    signal(mutex);
+  wait(x_sem);          //aspetta x
+  x_count --;           //decrementa il numero di thread in attesa di x
+
+Signal:
+  if (x_count > 0) {    //se c'è un thread in attesa di x
+    next_count ++;      // incrementa il numero di thread in attesa di entrare nel monitor
+    signal(x_sem);      // segnala a un thread in attesa di x
+    wait(next);         // aspetta di rientrare nel monitor
+    next_count --;      // decrementa il numero di thread in attesa di entrare nel monitor
+  }
+```
+
+Per ogni condizione x viene usato un semaforo x_sem e un contatore x_count inizializzato a 0
