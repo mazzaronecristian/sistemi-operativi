@@ -1393,7 +1393,7 @@ I problemi di sincronizzazione dovuti a un errato uso dei semafori sono molto di
 
 ### Monitor
 
-I monitor sono una astrazione di alto livello che fornisce un meccanismo conveniente ed efficiente per la sincronizzazione tra processi: **solo un processo per volta può essere attivo all'interno di un monitor**. <br>
+I monitor sono una astrazione di alto livello che fornisce un meccanismo conveniente ed efficiente per la sincronizzazione tra processi: **solo un processo per volta può essere attivo all'interno di un monitor**; infatt il vantaggio nell'utilizzo dei monitor è che non è necessatio codificare manualmente un sistema che garantisca la mutua esclusione dei processi.
 
 ```C
 monitor M {
@@ -1413,7 +1413,7 @@ monitor M {
   }
 }
 ```
-A differenza dei semafori, i monitor sono implementati dai linguaggi e non dai sistemi operativi
+A differenza dei semafori, i monitor sono implementati dai linguaggi e non dai sistemi operativi.
 
 ![monitor](images/monitor.png)
 
@@ -1510,3 +1510,105 @@ Signal:
 ```
 
 Per ogni condizione x viene usato un semaforo x_sem e un contatore x_count inizializzato a 0
+
+## Gestione dello Stallo
+
+Lo stallo è quello situazione in cui un insieme di processi sono bloccati, ognuno in possesso di una risorsa e in attesa di acquisire un'altra risorsa posseduta in quel momento da un altro processo. Abbiamo già visto l'esempio con i semafori: 
+
++ Duse semafori A e B, entrambi inizializzati a 1: 
+![esempio-stallo](images/esempio-stallo.png)
+I due processi si bloccano a vicenda se vengono eseguite in odine la prima wait di P0 e la prima wait di P1.
+
+Per studiare lo stallo abbiamo bisogno di definire un modello del sistema: Astraiamo il sistema in m tipi di risorse (R<sub>1</sub>,...,R<sub>m</sub>), che possono essere cicli di CPU, spazio di memoria etc... Ogni tipo di risorsa R<sub>i</sub> ha W<sub>i</sub> istanze e ogni processo usa una risorsa in questo modo:
+
++ richiesta
++ uso
++ rilascio
+
+Lo stallo può avvenire sotto determinate condizioni (condizioni necessarie, ma non sufficienti):
++ **Mutua esclusione**: solo un processo per volta può usare una risorsa
++ **Possesso e attesa**: un processo può richiedere una risorsa mentre ne possiede già un'altra
++ **No prelazione**: una risorsa non può essere tolta ad un processo finché non ha finito di usarla (solo rilascio volontario)
++ **Attesa circolare**: esiste una sequenza {P<sub>0</sub>, P<sub>1</sub>, ..., P<sub>0</sub>} di processi in attesa tale che P<sub>0</sub> richiede una risorsa posseduta da P<sub>1</sub> e così via fino a P<sub>n</sub> che richiede una risorsa posseduta da P<sub>0</sub>
+
+Tutte queste condizioni devono verificarsi contemporaneamente.
+
+### Grafo di allocazione delle risorse
+
+Definiamo una notazione per descrivere le varie situazioni in cui processi e risorse possono trovarsi: Usiamo i grafi, composti da nodi e da archi, per rappresentare le allocazioni delle risorse. <br>
+V = {P<sub>0</sub>, P<sub>1</sub>, ..., P<sub>n</sub>} è l'insieme dei processi e R = {R<sub>0</sub>, R<sub>1</sub>, ..., R<sub>m</sub>} è l'insieme delle risorse. <br>
+Un arco che va da un processo a una risorsa indica la richiesta di allocazione di una istanza. Un arco che va da una risorsa a un processo indica l'allocazione di una istanza. 
+
+![esempio-grafo-stallo](images/esempio-grafo-stallo.png)
+
+Nell'immagine riporata sopra abbiamo una situazione di stallo, in quanto il grafo contiene un ciclo. <br>
+
+![esempio-grafo-non-stallo](images/esempio-grafo-non-stallo.png)
+
+In questa seconda immagine invece non è presente uno stallo, in quanto basta che o P<sub>2</sub> o P<sub>4</sub> finiscano con le risorse per sbloccare P<sub>3</sub> e P<sub>1</sub>.
+
+Vediamo alcuni fatti: Se il grafo non ha cicli, allora non c'è stallo. Se il grafo ha un ciclo, allora si ha stallo solo se ogni risorsa possiede una sola istanza; altrimenti si ha solo la possibilità di stallo.
+
+Per gestire lo stallo ci sono tre strategie:
+
++ Prevenire o evitare situazioni di stallo in modo che il sistema non ci possa entrare
++ Permettere le situazioni di stallo, ma rilevarle e ripristinare il sistema
++ Ignorare il problema e fingere che non esista (Linux e Windows usano questa strategia)
+
+### Prevenzione dello stallo
+
+Per prevenire lo stallo andiamo a vincolare le modalità di richieste delle risorse da parte dei processi, in modo da escludere **almeno una** delle 4 condizioni necessarie allo stallo:
+
++ Mutua esclusione: non è necessare per le risorse condivise; è obbligatoria per le risorse non condivise
++ Possesso e attesa: un processo deve richiedere tutte le risorse di cui ha bisogno in una volta sola, prima di iniziare l'esecuzione. Questa strategia causa una bassa utilizzazione delle risorse e una possibile attesa indefinita da parte di altri processi.
++ No prelazione: Un processo in possesso di alcune risorse richieda una risorsa non disponibile al momento, allora tutte le risorse da lui possedute vengono rilasciate. Le risorse prelazionete sono algiunte alla lista delle risorse per cui il processo è in attesa. Quando tutte le risorse sono disponibili (sia quelle che aveva che le nuove che ha richeisto)
++ Attesa circolare: viene imposto un ordinamento totale a tutti i tipi di risorsa e i processi possono richiedere le risorse solo in ordine crescente (si evita il ciclo)
+
+### Evitare lo stallo
+
+Per evitare lo stallo è necessario che il sistema sia in possesso di informazioni aggiuntive sui processi. Il modello più semplice prevede che ogni processo debba dichiarare a priori il numero massimo di istanze di ogni tipo di risorsa che può richiedere. L'algoritmo per evitare lo stallo esamina dinamicamente lo stato di allocazione delle risorse per assicurare che non ci potrà mai essere una condizione di attesa circolare. Lo **stato di allocazione delle risorse** è definito dal numero di risorse disponibili e allocate e dalle richieste massime dei processi. 
+
+Ciò che vogliamo è che, quando un processo richiede una risorsa disponibile, il sistema decida se l'allocazione immediata al processo lascia il sistema in uno **stato sicuro**. Uno stato è sicuro se esiste una sequenza sicura di tutti i processi. Una **sequenza** {P<sub>1</sub>, ..., P<sub>n</sub>} è **sicura** se per ogni processo P<sub>i</sub>, le risorse che P<sub>i</sub> può ancora richiedere possono essere soddisfatte con le risorse attualmente disponibili più quelle possedute dai processi P<sub>j</sub> con j<i . <br>
+Se le necessità di P<sub>i</sub> non sono disponibili, allora P<sub>i</sub> viene sospeso fino a che tutti i processi P<sub>j</sub> abbiano finito. Quando tutti i P<sub>j</sub> hanno finito, P<sub>i</sub> può ottenere tutte le risorse necessarie, eseguire, rilasciare le risorse e terminare.
+
+Vediamo alcuni fatti: se il sistema è in uno stato sicuro, allora non c'è stallo; se il sistema è in uno stato non sicuro, allora c'è la possibilità di stallo.
+
+![evitare-stallo](images/evitare-stallo.png)
+
+### Algoritmo con grafo di allocazione delle risorse
+
+Si usa solo per risorse con una singola istanza. Al grafo viene aggiungo un unuovo tipo di arco: L'arco di rivendicazione, che indica che un processo in futuro potrebbe effettuare una richiesta su una determinata risorsa; si indica con una linea tratteggiata. <br>
+Un arco di rivendicazione può essere convertito in un arco di richiesta quando un processo richede la risorsa. Quando la risorsa viene rilasciata dal processo, l'arco di assegnazione verrò convertito in arco di rivendicazione. <br> 
+Una risorsa viene concessa se dopo la sostituzione dell'arco (rivendicazione -> assegnazione) non si crea un ciclo. <br>
+
+![algoritmo-singola-istanza](images/algoritmo-singola-istanza.png)
+
+### Algoritmo del Banchiere
+
+Si applica a situazioni in cui le risorse hanno multiple istanze. Ogni processo deve dichiarare a priori il massimo uso per ogni tipo di risorse. Quando un processo prende tutte le risorse necessarie le deve rilasciare entro un tempo finito. <br>
+Vediamo le strutture che usa questo algoritmo:
+
++ **Available**: vettore di lunghezza m, che indica il numero di istanze disponibili per ogni tipo di risorsa
++ **Max**: matrice di dimensione n x m, che indica il numero massimo di istanze di ogni tipo di risorsa che un processo può richiedere (es. Max[i,j] = k indica che il processo i può richiedere al massimo k istanze della risorsa j)
++ **Allocation**: matrice di dimensione n x m, che indica il numero di istanze di ogni tipo di risorsa attualmente allocate ad ogni processo (es. Allocation[i,j] = k indica che il processo i ha attualmente k istanze della risorsa j)
++ **Need**: matrice di dimensione n x m, che indica il numero di istanze di ogni tipo di risorsa che un processo può richiedere per completare l'esecuzione (es. Need[i,j] = k indica che il processo i ha bisogno di k istanze della risorsa j per completare l'esecuzione). Si calcola come Need[i,j] = Max[i,j] - Allocation[i,j].
+
+Vediamo l'algoritmo:
+
++ **Step 1**: Siano Work e Finish vettori di lunghezza m e n, rispettivamente. Inizializziamo Work = Available e Finish[i] = false per ogni i.
++ **Step 2**: Troviamo un processo i tale che:
+  + Finish[i] = false
+  + Need[i,j] <= Work[j] per ogni j
+  Se non esiste un processo che soddisfa queste condizioni, vai allo step 4.
++ **Step 3**: Work = Work + Allocation[i] e Finish[i] = true. Torna allo step 2.
++ **Step 4**: Se Finish[i] = true per ogni i, allora il sistema è in uno **stato sicuro**!
+
+Supponiamo di essere in uno stato sicuro, vediamo l'algoritmo di richiesta delle risorse per il processo P<sub>i</sub>: Definisco Request[i] il vettore delle richieste per il procoesso i. Se Request[i,j] = k, allora il processo i vuole k istanze della risorsa j. Vediamo i passi:
++ Se Request[i] <= Need[i], allora vai allo step 2; altrimenti il processo ha fatto una richiesta non valida e viene terminato.
++ Se Request[i] <= Available, allora vai allo step 3; altrimenti il processo deve aspettare, in quanto non ci sono abbastanza risorse disponibili.
++ Pretende di allocare le risorse richieste dal processo i modificando lo stato come segue: 
+  + Available = Available - Request[i]
+  + Allocation[i] = Allocation[i] + Request[i]
+  + Need[i] = Need[i] - Request[i]
+  
+  Se il sistema è in uno stato sicuro, allora la richiesta può essere soddisfatta. Se il sistema è in uno stato insicuro, allora la richiesta viene rifiutata e il sistema mantiene il suo stato originale.
