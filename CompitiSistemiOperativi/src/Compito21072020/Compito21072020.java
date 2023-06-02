@@ -1,7 +1,7 @@
 package Compito21072020;
 
 import java.util.ArrayList;
-import java.util.List;
+
 import java.util.concurrent.Semaphore;
 
 public class Compito21072020 {
