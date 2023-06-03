@@ -1575,7 +1575,7 @@ Vediamo alcuni fatti: se il sistema è in uno stato sicuro, allora non c'è stal
 
 ![evitare-stallo](images/evitare-stallo.png)
 
-### Algoritmo con grafo di allocazione delle risorse
+#### Algoritmo con grafo di allocazione delle risorse
 
 Si usa solo per risorse con una singola istanza. Al grafo viene aggiungo un unuovo tipo di arco: L'arco di rivendicazione, che indica che un processo in futuro potrebbe effettuare una richiesta su una determinata risorsa; si indica con una linea tratteggiata. <br>
 Un arco di rivendicazione può essere convertito in un arco di richiesta quando un processo richede la risorsa. Quando la risorsa viene rilasciata dal processo, l'arco di assegnazione verrò convertito in arco di rivendicazione. <br> 
@@ -1583,7 +1583,7 @@ Una risorsa viene concessa se dopo la sostituzione dell'arco (rivendicazione -> 
 
 ![algoritmo-singola-istanza](images/algoritmo-singola-istanza.png)
 
-### Algoritmo del Banchiere
+#### Algoritmo del Banchiere
 
 Si applica a situazioni in cui le risorse hanno multiple istanze. Ogni processo deve dichiarare a priori il massimo uso per ogni tipo di risorse. Quando un processo prende tutte le risorse necessarie le deve rilasciare entro un tempo finito. <br>
 Vediamo le strutture che usa questo algoritmo:
@@ -1593,22 +1593,60 @@ Vediamo le strutture che usa questo algoritmo:
 + **Allocation**: matrice di dimensione n x m, che indica il numero di istanze di ogni tipo di risorsa attualmente allocate ad ogni processo (es. Allocation[i,j] = k indica che il processo i ha attualmente k istanze della risorsa j)
 + **Need**: matrice di dimensione n x m, che indica il numero di istanze di ogni tipo di risorsa che un processo può richiedere per completare l'esecuzione (es. Need[i,j] = k indica che il processo i ha bisogno di k istanze della risorsa j per completare l'esecuzione). Si calcola come Need[i,j] = Max[i,j] - Allocation[i,j].
 
-Vediamo l'algoritmo:
+Vediamo l'**algoritmo di verifica della sicurezza**:
 
-+ **Step 1**: Siano Work e Finish vettori di lunghezza m e n, rispettivamente. Inizializziamo Work = Available e Finish[i] = false per ogni i.
++ **Step 1**: Siano Work (occupazione delle risorse) e Finish (indica il se il processo è terminabile) vettori di lunghezza m e n, rispettivamente. Inizializziamo Work = Available e Finish[i] = false per ogni i.
 + **Step 2**: Troviamo un processo i tale che:
-  + Finish[i] = false
-  + Need[i,j] <= Work[j] per ogni j
+  
+  + Finish[i] = false (non abbiamo ancora stabilito se può terminare)
+  + Need[i,j] <= Work[j] per ogni j (il processo i-esimo può essere terminato )
+  
   Se non esiste un processo che soddisfa queste condizioni, vai allo step 4.
 + **Step 3**: Work = Work + Allocation[i] e Finish[i] = true. Torna allo step 2.
 + **Step 4**: Se Finish[i] = true per ogni i, allora il sistema è in uno **stato sicuro**!
 
-Supponiamo di essere in uno stato sicuro, vediamo l'algoritmo di richiesta delle risorse per il processo P<sub>i</sub>: Definisco Request[i] il vettore delle richieste per il procoesso i. Se Request[i,j] = k, allora il processo i vuole k istanze della risorsa j. Vediamo i passi:
-+ Se Request[i] <= Need[i], allora vai allo step 2; altrimenti il processo ha fatto una richiesta non valida e viene terminato.
-+ Se Request[i] <= Available, allora vai allo step 3; altrimenti il processo deve aspettare, in quanto non ci sono abbastanza risorse disponibili.
-+ Pretende di allocare le risorse richieste dal processo i modificando lo stato come segue: 
+Supponiamo di essere in uno stato sicuro. Vediamo l'**algoritmo di richiesta delle risorse** per il processo P<sub>i</sub>: Definisco Request[i] il vettore delle richieste per il procoesso i. Se Request[i,j] = k, allora il processo i vuole k istanze della risorsa j. Vediamo i passi:
++ **Step 1**: Se Request[i] <= Need[i], allora vai allo step 2; altrimenti il processo ha fatto una richiesta non valida e viene terminato.
++ **Step 2**: Se Request[i] <= Available, allora vai allo step 3; altrimenti il processo deve aspettare, in quanto non ci sono abbastanza risorse disponibili.
++ **Step 3**: Pretende (simula) di allocare le risorse richieste dal processo i modificando lo stato come segue: 
   + Available = Available - Request[i]
   + Allocation[i] = Allocation[i] + Request[i]
   + Need[i] = Need[i] - Request[i]
   
-  Se il sistema è in uno stato sicuro, allora la richiesta può essere soddisfatta. Se il sistema è in uno stato insicuro, allora la richiesta viene rifiutata e il sistema mantiene il suo stato originale.
+  Se il sistema è in uno **stato sicuro**, allora la richiesta può essere soddisfatta. Se il sistema è in uno **stato insicuro**, allora la richiesta viene rifiutata e il sistema mantiene il suo stato originale.
+
+### Rilevamento dello stallo
+
+In questo caso si permette al sistema di entrare in stallo, ma si rileva la situazione  attraverso un algoritmo di rilevamento e si ripristina il sistema. <br>
+Nel caso di una singola istanza per risorse possiamo usare il grafo di attesa per individuare eventuali cicli. Il grado di attesa ha come vertici i processi; egli archi P<sub>i</sub>->P<sub>j</sub> tali che il processo i è in attesa del processo j. <br>
+
+![grafo-attesa](images/grafo-attesa.png)
+
+Nel caso in cui si abbiano più istanze per risorsa, dobbiamo definire le seguenti strutture dati:
+
++ Available: vettore di lunghezza m, che indica il numero di istanze disponibili per ogni tipo di risorsa
++ Allocation: matrice di dimensione n x m, che indica il numero di istanze di ogni tipo di risorsa attualmente allocate ad ogni processo (es. Allocation[i,j] = k indica che il processo i ha attualmente k istanze della risorsa j)
++ Request: matrice di dimensione n x m, che indica la richiesta corrente di ogni processo (es. Request[i,j] = k indica che il processo i ha richiesto k istanze della risorsa j)
+
+Vediamo l'**algoritmo per la rilevazione dello stallo**:
+
++ **Step 1**: Inizializza Work = Available e Finish[i] = false per ogni i tale che Allocation[i] diverso da 0; altrimenti Finish[i] = true.
++ **Step 2**: Trovare un indice i tale che:
+  + Finish[i] = false
+  + Request[i] <= Work
+  
+  Se non esiste un processo che soddisfa queste condizioni, vai allo 
+  step 4.
++ **Step 3**: Work = Work + Allocation[i] e Finish[i] = true. Torna allo step 2.
++ **Step 4**: Se Finish[i] = false per qualche i, allora il sistema è in uno **stato di stallo**! Inoltre, se Finish[i] = false allora il processoo i è in stallo.
+
+Questo algoritmo ha un costo computazionale elevato, dell'ordine di $O(m*n$<sup>2</sup>$)$. 
+
+A questo punto ci chiediamo: Quando e ogni quanto dobbiamo invocare l'algoritmo? La risposta dipende da ogni quanto potrebbe verificarsi uno stallo e dal numero di processi che dovranno essere annullati (rolled back, uno per ogni ciclo disgiunto). <br>
+Se l'algoritmo di rilevamente viene invocato arbitrariamente c'è il ricschio che si possano formare troppi cicli nel grafo delle risorse che non siamo in grado di individuare quello che ha causato lo stallo. D'altra parte, eseguirlo troppo frequentemente farebbe salire drasticamente il costo computazionale. <br>ù
+Il ripristino dello stallo avviene secondo due modalità:
+
++ terminare i processi: 
+  + terminare tutti processi;
+  + terminare un processo alla volta fino a risolvere lo stallo; Il processo da terminare viene scelto in base a vari fattori come la priorità, il tempo per cui ha computato, le risorse possedute...
++ prelazione delle risorse: si **seleziona una vittima** minimizzando il costo; si esegue un **rollback**, ovvero si ritorna a uno stato sicuro e si fa ripartire il processo da quel punto. Il problema di questo sistema è che potrebbe venir scelto sempre lo stesso processo come vittima...per evitare il problema includiamo il numero di rollback nel fattore di costo. 
