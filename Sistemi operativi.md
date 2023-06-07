@@ -1618,7 +1618,7 @@ Supponiamo di essere in uno stato sicuro. Vediamo l'**algoritmo di richiesta del
 ### Rilevamento dello stallo
 
 In questo caso si permette al sistema di entrare in stallo, ma si rileva la situazione  attraverso un algoritmo di rilevamento e si ripristina il sistema. <br>
-Nel caso di una singola istanza per risorse possiamo usare il grafo di attesa per individuare eventuali cicli. Il grado di attesa ha come vertici i processi; egli archi P<sub>i</sub>->P<sub>j</sub> tali che il processo i è in attesa del processo j. <br>
+Nel caso di una singola istanza per risorse possiamo usare il grafo di attesa per individuare eventuali cicli. Il grafo di attesa ha come vertici i processi; egli archi P<sub>i</sub>->P<sub>j</sub> tali che il processo i è in attesa del processo j. <br>
 
 ![grafo-attesa](images/grafo-attesa.png)
 
@@ -1643,7 +1643,7 @@ Vediamo l'**algoritmo per la rilevazione dello stallo**:
 Questo algoritmo ha un costo computazionale elevato, dell'ordine di $O(m*n$<sup>2</sup>$)$. 
 
 A questo punto ci chiediamo: Quando e ogni quanto dobbiamo invocare l'algoritmo? La risposta dipende da ogni quanto potrebbe verificarsi uno stallo e dal numero di processi che dovranno essere annullati (rolled back, uno per ogni ciclo disgiunto). <br>
-Se l'algoritmo di rilevamente viene invocato arbitrariamente c'è il ricschio che si possano formare troppi cicli nel grafo delle risorse che non siamo in grado di individuare quello che ha causato lo stallo. D'altra parte, eseguirlo troppo frequentemente farebbe salire drasticamente il costo computazionale. <br>ù
+Se l'algoritmo di rilevamente viene invocato arbitrariamente c'è il ricschio che si possano formare troppi cicli nel grafo delle risorse che non siamo in grado di individuare quello che ha causato lo stallo. D'altra parte, eseguirlo troppo frequentemente farebbe salire drasticamente il costo computazionale. <br>
 Il ripristino dello stallo avviene secondo due modalità:
 
 + terminare i processi: 
