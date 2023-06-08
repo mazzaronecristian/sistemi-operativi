@@ -764,19 +764,19 @@ E supponiamo che i processi arrivino nell'ordine: *P1, P2, P3*. Il **diagramma d
 
 ![fcfs](images/fcfs.png)
 
-+ tempo di attesa: per $P1 = 0$, per $P2 = 24$, per $P3 = 27$
-+ tempo medio di attesa: $17$
-+ tempo medio di completamento: $(24+27+30)/3=27$
-+ tempo medio di risposta: $(0+24+27)/3=17$
++ tempo di attesa: per *P1 = 0*, per *P2 = 24*, per *P3 = 27*
++ tempo medio di attesa: *17*
++ tempo medio di completamento: *( 24 + 27 + 30 )/3 = 27*
++ tempo medio di risposta: *( 0 + 24 + 27 )/3 = 17*
 
 Supponiamo invece che l'ordine di arrivo sia: *P2, P3, P1*
 
 ![fcfs1](images/fcfs1.png)
 
-+ tempo di attesa: per $P1 = 6$, per $P2 = 0$, per $P3 = 3$
-+ tempo medio di attesa: $3$
-+ tempo medio di completamento: $(3+6+30)/3=13$
-+ tempo medio di risposta: $(0+3+6)/3=3$
++ tempo di attesa: per *P1 = 6*, per *P2 = 0*, per *P3 = 3
++ tempo medio di attesa: *3*
++ tempo medio di completamento: *( 3 + 6 + 30 )/3 = 13*
++ tempo medio di risposta: *( 0 + 3 + 6 )/3 = 3*
 
 Possiamo notare che l'aver mandato in esecuzione i processi corti prima del processo lungo, ha portato a un miglioramento del tempo medio di attesa. Questo è vero in generale: chiamiamo **effetto convoglio** l'aumento del tempo di attesa dovuto all'esecuzione dei processi lunghi prima dei processi corti.
 
@@ -788,11 +788,11 @@ Associa a ogni processo la **lunghezza del prossimo CPU burst**. Queste lunghezz
 
 Le frecce indicano il tempo di arrivo dei vari processi
 
-+ Tempo di attesa medio: $(0 + 6 + 3 + 7)/4 = 4$
++ Tempo di attesa medio: *( 0 + 6 + 3 + 7 )/4 = 4*
 
 ![SJF-preemptive](images/SJF-preemptive.png)
 
-+ Tempo di attesa medio:  $(9 + 1 + 0 +2)/4 = 3$
++ Tempo di attesa medio:  *( 9 + 1 + 0 +2 )/4 = 3*
 
 Noi non possimao determinare la lunghezza del prossimo CPU burst; possiamo solo stimarlo valutando la storia passata dell'uso della CPU da parte dei processi e cercare di fare a una previsione. Facendo una media esponenziale:
 
@@ -818,9 +818,9 @@ Vediamo un esempio con *q = 20*:
 
 ![RR](images/RR.png) 
 
-+ Tempo di attesa medio: $(((77
-20)+(121 97))+20+(37+(97 57)+(134 117))+(57+(117 77)))/4 =
-(81 + 20 + 94 + 97) / 4 = 73$ (con SJF verrebbe 38)
++ Tempo di attesa medio: *( ( ( 77 -
+20 ) + ( 121 - 97 ) ) + 20 + ( 37 + ( 97 - 57 ) + ( 134 - 117 ) ) + ( 57 + ( 117 - 77 ) ) ) / 4 =
+( 81 + 20 + 94 + 97 ) / 4 = 73* (con SJF verrebbe 38)
 
 tipicamente si ha un tempo di completamento medio più elevato rispetto a SJF, ma si ha un miglioramento nel tempo di risposta. <br>
 Nell'esempio di sopra vengono eseguiti 9 context switch.
@@ -1650,3 +1650,106 @@ Il ripristino dello stallo avviene secondo due modalità:
   + terminare tutti processi;
   + terminare un processo alla volta fino a risolvere lo stallo; Il processo da terminare viene scelto in base a vari fattori come la priorità, il tempo per cui ha computato, le risorse possedute...
 + prelazione delle risorse: si **seleziona una vittima** minimizzando il costo; si esegue un **rollback**, ovvero si ritorna a uno stato sicuro e si fa ripartire il processo da quel punto. Il problema di questo sistema è che potrebbe venir scelto sempre lo stesso processo come vittima...per evitare il problema includiamo il numero di rollback nel fattore di costo. 
+
+## Gestione della Memoria
+E' compito del sistema operativo gestire la memoria al meglio. Ha il compito di:
+
++ Assegnare la memoria ai processi che ne hanno bisogno;
++ Isolare i processi facendo in modo che non possano accidentalmente accedere o modificare la mamoria riservata a altr processi (o al SO stesso)
++ Utilizzare la memoria in modo efficente 
++ Condividere la stessa zona di memoria tra più processi in caso sia necessario, per esempio se più processi operano sullo stesso codice
+  
+Un modo per gestire la memoria è il cosiddetto **swapping**. Un processo può essere tolto temporaneamente dalla memoria (swapped) e portato su disco (backing store), quindi riportato in memoria successivamente per continuare l'esecuzione. Il **Backing store** è un disco veloce abbastanza grande per memorizzare tutte le copie delle immagini di memoria di tutti gli utenti; deve dare accesso diretto a queste immagini di memoria. <br>
+Una variante dello swapping è il **Roll out, roll in**, usata con scheduling a priorità: i processi a bassa priorità sono swapped out in modo che i processi a priorità più alta possano essere caricati ed eseguiti. <br>
+La maggior parte del tempo di swap è il tempo di trasferimento, che è direttamente proporzionale alla quantità di memoria da trasferire. Molti sistemi operativi usano ancora questo sistema.
+
+![swapping](images/swapping.png)
+
+Oggi in realtà non è così semplice, ci sono tecniche più articolate. Introduciamo infatti due concetti: **spazio di indirizzamento logico** e **spazio di indirizzamento fisico**, fondamentali per la gestione della memoria. <br>
+Un indirizzo logico è u indirizzo generato dalla CPU; chiamato anche indirizzo virtuale. Un indirizzo fisico è un indirizzo visto dalla unità di memoria. Ogni processo ha il proprio spazio di indirizzi logici e **ogni processo è isolato dagli altri**, infatti un processo non può accedere volontariamente o involontariamente agli spazi di memoria degli altri processi. <br>
+Più spazi di indirizzi logici devono essere associati allo stesso spazio di indirizzi fisici. 
+
+### Memory-Management Unit (MMU)
+L'MMU è un dispositivo che mappa gli indirizzi logici sugli indirizzi fisici. Un esempio di MMU può usare un registro di rilocazione, il cui valore viene sommato per ogni indirizzo generato da un processo utente quando questi accede alla memoria. Il programma utente ha a che fare colo gli indirizzi logici e non vede mai quelli fisici.
+
+![MMU](images/MMU.png)
+
+Ormai l'MMU è integrato direttamente nella CPU
+
+### Allocazione contigua (storica)
+Questa tecnica per la gestione di memoria consiste nel dividere la memoria in due parti: 
+
++ Una con codice e dati del sistema operativo, solitamente tenuta nella parte bassa della mamoria indieme al vettore delle interruzioni;
++ Una usata per tenere i processi degli utenti, solitamente nella parte alta
+
+Ogni processo ha associata una sola partizione di memoria. Il registro di rilocazione viene usato per proteggere i processi utenti da altri processi e dal modificare codice e dati del sistema operativo. Il registro di rilocazione contiene il valore dell'indirizzo fisico più basso riservato al processo (base); il registro limite invece contiente la dimensione della partizione,, il limite massimo della memoria riserata al processo (ogni indirizzo logico deve essere inferiore a questo numero).
+
+![base-limite](images/base-limite.png)
+
+![protezione-memoria](images/protezione-memoria.png)
+
+Nel context switch il sistema opertivo deve reimpostare i registi *limit* e *base* con i valori assoicati al processo, solitamente conenuti nel **PCB**. <br>
+
+Nell'allocare processi multi può succedere che si vadano a formare dei buchi, ovvero dei blocchi di memoria libera che possono avere varie dimensioni. Quando un processo arriva viene allocato in un buco abbastanza grande da poterlo contenere. Il sistema operativo deve quindi tenere traccia delle partizioni allocate e dei buchi. <br>
+Questa allocazione **dinamica** può essere fatta in tre modi:
+
++ **First-fit**: cerca il primo buco abbastanza grande da poter contenere il processo
++ **Best-fit**: cerca il buco più piccolo che può contenere il processo
++ **Worst-fit**: cerca il buco più grande che può contenere il processo (più dispendiosa in termini di tempo e di memoria).
+
+Il probelma di questa tecnica è che la memoria può essere **frammentata**, ovvero può essere divisa in tanti pezzi piccoli, ma nessuno abbastanza grande per soddisfare una richiesta. In questo caso si può ricorrere alla **compattazione** delle partizioni: si spostano i processi in memoria in modo da unire i buchi liberi in un unico buco più grande. Questa tecnica è molto costosa in termini di tempo e non è sempre possibile. <br>
+La frammentaione appena descritta è detta **frammentazione esterna**. Esiste anche la **frammentazione interna**, che si ha quando la memoria allocata è maggiore di quella richiesta, causando quindi uno spreco di spazio di memoria. <br>
+
+### Segmentazione
+
+La segmentazione è una tecnica di gestione della memoria che supporta la condivisione e la protezione dei processi. Un programma è diviso in segmenti logici, come codice, dati, stack, procedure, array, etc... Ogni segmento ha un nome e una lunghezza. <br>
+
+![segmentazione](images/segmentazione.png)
+
+I segmenti non sono tra loro ordinati e possono essere posti in memoria in qualsiasi orfine, in modo da utilizzare al meglio la memoria disponibile. <br>
+Questa è una visione logica della segmentazione:
+
+![segmentazione-logica](images/segmentazione-logica.png)
+
+Gli indirizzi logici sono formati da due valori: *<numero di segmento, offset>*.<br>
+La **tabella dei segmenti** associa a ogni elemento una base e un limite. Il limite indica la lunghezza del segmento, mentre la base indica l'indirizzo fisico in cui inizia il segmento. Il registro di base della tabella dei segmenti puna alla tabella dei segmenti del processo in esecuzione. <br>
+In questa architettura:
+
++ la **rilocazione** avviene in modo dinamico ed usa la tabella dei segmenti
++ la **condivisione** dei segmenti di memoria è molto semplice. Ongni processo può usare lo stesso numero di segmento, quindi è sufficiente che due processi abbiano lo stesso valore di base per condividere un segmento
++ l'**allocazione** di ogni segmeno è fatta usando una delle tecniche viste prima (first fit/best fit). Non viene risola la frammentazione esterna.
++ la **protezione** è fatta usando i bit di protezione per ogni segmento. Questi bit sono tenuti nella tabella dei segmenti. Il bit di protezione indica se il segmento può essere letto/scritto/eseguito. Se un processo tenta di accedere a un segmento in modo non permesso, viene generata un'eccezione.
+  + bit validazione = 0, allora il segmento è illegale e il processo viene terminato
+
+In questo caso l'MMU è fatto così:
+
+![MMU-segmentazione](images/MMU-segmentazione.png)
+
+Vediamo cosa succede se due processi condividono il segmento *editor*: il SO lancia l'editor, lo alloca in memoria, poi alloca una zona di memoria per i dati di un processo; si accorge anche anche un altro processo usa il segmento *editor*, quindi riutilizza la stessa zona di memoria, dandogli la stessa base del segmento *editor*. In questo modo risparia tempo e memoria. <br>
+
+![segmenti-condivisi](images/segmenti-condivisi.png)
+
+### Paginazione
+
+Lo spazio degli indirizzi logici di un processo può non essere contiguo; un processo è allocato nella memoria fisica dove questa è libera. La memoria fisica è divisa in blocchi di dimensione fissa, detti **frame**. La memoria logica è divisa in blocchi di uguale dimensione, detti **pagine**. La dimensione di questi blocchi è una potenza del due, solitamente va dai 512 byte ai 8192 byte. <br>
+Per eseguire un programma che usa n pagine, il sistema operativo deve trovare n frame liberi per caricare il programma nella memoria fisica. Inoltre, il SO deve mantenere impostare una tabella delle pagine per tradurre un indirizzo logico in un indirizzo fisicio (ogni processo ha la sua tabella). <br>
+Questo sistema risolve il problema della frammentazione esterna, ma è soggetto a frammentazione interna, in quanto un processo può usare solo un numero intero di frame. <br>
+
+![paginazione](images/paginazione.png)
+
+L'MMU per questo sistema è fatto così:
+
+![MMU-paginazione](images/MMU-paginazione.png)  
+
+L'indirizzo logico è suddiviso in due parti:
+
++ Numero di pagina (p): usato come indicie nella tabella delle pagine che contiene l'indirizzo di base di ogni pagina nella memoria fisica
++ offset (d): combinato con l'indirizzo di bade per defirnire l'indirizzo della memoria fisica che viene inviato alla memoria.
+
+La tabella delle pagine è tenuta in memoria e viene usato un registro di CPU PTBR (Registro di bade della tabella delle pagine) per puntare alla tabelle delle pagine del processo attivo. In questo schema sono quindi necessari due accessi in memoria: uno per la tabella delle pagine e uno per il dato/istruzione. Questo è un problema, in quando si vanno a dimezzare le performance del sistema. <br>
+Per risolvere il problema andiamo a usa una **cache Associativa**, detta anche **Translation Look-aside Buffer (TLB)**. Questa cache consiste n una tabella che associa al numero della pagina il numero corretto del frame. In questa tabella vengono caricate le associazioni più recentemente utilizzate, in quanto è molto probabile che nel prossimo futuro vengano riusate: se la pagina è presente nella cache, allora il numero di frame viene caricato dalla TLB e si esegue un solo accesso alla memoria; altrimenti viene eseguito un accesso in memoria per trovare il numero di frame che, oltre a essere usato per l'indirizzo fisico viene anche caricato nella TLB: <br>
+
+![TLB-paginazione](images/TLB-paginazione.png)
+
+Ipotizziamo che la ricerca associatia tramite la TLB avvenga in un tempo $\epsilon$ e che l'accesso alla memoria avvenga in un tempo di 1 microsecondo. Dobbiamo definire il tasso di successi (*hit ratio*): percentuale delle volte che un numero di pagina viene trovato nei registri associativi; dipende dal numero di registri associativi. Chiamiamo questo tasso $\alpha$. <br>
+Il tempo medio di accesso alla memoria è quindi: *EAT = ( 1 + t )a + ( 2 + t )( 1-a ) = 2 + t - a*
