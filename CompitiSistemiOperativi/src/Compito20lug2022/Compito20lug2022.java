@@ -1,9 +1,9 @@
-package Compito20072022;
+package Compito20lug2022;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class Compito20072022 {
+public class Compito20lug2022 {
 	public static void main(String[] args) throws InterruptedException{
 		int m = 6;		//* numero dei voli
 		int n = 4;		//* numero delle stazioni di check in

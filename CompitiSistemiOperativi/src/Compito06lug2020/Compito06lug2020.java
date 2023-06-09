@@ -1,6 +1,6 @@
-package Compito06072020;
+package Compito06lug2020;
 
-public class Compito06072020 {
+public class Compito06lug2020 {
     public static void main(String[] args) throws InterruptedException {
         int N = 20;
         Environment env = new Environment(N);

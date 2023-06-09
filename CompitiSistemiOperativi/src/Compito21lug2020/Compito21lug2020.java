@@ -1,10 +1,10 @@
-package Compito21072020;
+package Compito21lug2020;
 
 import java.util.ArrayList;
 
 import java.util.concurrent.Semaphore;
 
-public class Compito21072020 {
+public class Compito21lug2020 {
     public static void main (String[] args) throws InterruptedException{
         int M = 4;      //* Numero di stanze
         int K = 3;      //* Numero di stanze da visitare a volta
