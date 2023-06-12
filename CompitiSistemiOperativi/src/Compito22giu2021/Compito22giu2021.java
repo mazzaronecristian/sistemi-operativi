@@ -9,9 +9,11 @@ public class Compito22giu2021 {
         int k = 7;
         LocationTracker locationTracker = new LocationTracker();
         ImageQueue imageQueue = new ImageQueue(k);
+
         Vehicle[] vehicles = new Vehicle[n];
         Uploader[] uploaders = new Uploader[vehicles.length];
         LocalQueue[] localQueues = new LocalQueue[vehicles.length];
+
         ImageCollector[] imageCollectors = new ImageCollector[m];
 
         for (int i = 0; i<imageCollectors.length; i++){
@@ -22,17 +24,28 @@ public class Compito22giu2021 {
 
         for (int i = 0; i<vehicles.length; i++){
             localQueues[i] = new LocalQueue();
-            vehicles[i] = new Vehicle(locationTracker,localQueues[i], (float)(Math.random()*20-10),(float)(Math.random()*20-10));
+            vehicles[i] = new Vehicle(locationTracker,localQueues[i],
+                                    (float)(Math.random()*20-10),(float)(Math.random()*20-10));
             vehicles[i].setName("V"+i);
             vehicles[i].start();
             uploaders[i] = new Uploader(localQueues[i], imageQueue);
             uploaders[i].setName("U"+i);
             uploaders[i].start();
         }
+        Thread.sleep(1000);
+        int[] cPerPrior = {locationTracker.counterPerPrior[0],locationTracker.counterPerPrior[1],locationTracker.counterPerPrior[2]};
+        for(int i = 0; i< 29; i++){
+            System.out.println("n veicoli secondo priorità nell'ultimo secondo:" +
+                    " H "+cPerPrior[2]+" M "+cPerPrior[1]+" B "+cPerPrior[0]);
 
-        for(int i = 0; i< 30; i++){
-            //TODO: aggiungere le stampe di debug
+            System.out.println("n immagini nella coda di upload, divisi per priorità:"+
+                    " H "+imageQueue.counterPerPrior[2]+" M "+imageQueue.counterPerPrior[1]+
+                    " B "+imageQueue.counterPerPrior[0]);
+
             Thread.sleep(1000);
+            cPerPrior[0] = locationTracker.counterPerPrior[0]-cPerPrior[0];
+            cPerPrior[1] = locationTracker.counterPerPrior[1]-cPerPrior[1];
+            cPerPrior[2] = locationTracker.counterPerPrior[2]-cPerPrior[2];
         }
         for (int i = 0; i<vehicles.length; i++){
             vehicles[i].interrupt();
@@ -44,14 +57,18 @@ public class Compito22giu2021 {
             imageCollectors[i].interrupt();
             imageCollectors[i].join();
         }
-
-        //TODO: stampare i vari valori richeisti nel testo
-
+        int totChanges = 0;
+        for(Vehicle v:vehicles){
+            totChanges += v.nChanges;
+            System.out.println(v.getName()+ " si è mosso "+ v.nChanges+ " volte");
+        }
+        System.out.print("per un totale di "+ totChanges+ " spostamenti = ");
+        System.out.println("numero di richieste gestite da locationTracker "+ locationTracker.nRequest);
     }
 }
 
 class Image{
-    int prior; //* 0 = bassa priorità, 1 = media priorità, 2 = alta priorità
+    int prior;      //* 0 = bassa priorità, 1 = media priorità, 2 = alta priorità
     String owner;
 
     public Image(int prior, String owner){
@@ -62,20 +79,21 @@ class Image{
 }
 
 class LocationTracker{
-    int nRequest = 0; //* n tot di richieste
+    int nRequest = 0;                   //* n tot di richieste
     int[] counterPerPrior = {0,0,0};
 
     public synchronized int getPrior(float x, float y){
         nRequest++;
-        if(dist(x, y) < 5){ //* priorità alta
+        if(dist(x, y) < 5){             //* priorità alta
             counterPerPrior[2]++;
             return 2;
         }
-        if(dist(x, y) > 5 && dist(x, y) < 10){ //* priorità media
-            counterPerPrior[1]++;
-            return 1;
-        }
-        counterPerPrior[0]++; //* priorità bassa
+        if (5 < dist(x, y))
+            if (dist(x, y) < 10) {      //* priorità media
+                counterPerPrior[1]++;
+                return 1;
+            }
+        counterPerPrior[0]++;           //* priorità bassa
         return 0;
     }
 
@@ -99,7 +117,7 @@ class ImageQueue{
         }
         counterPerPrior[img.prior]++;
         images.add(img);
-        notifyAll(); //* notifica agli image collector che l'immagine è stata inserita
+        notifyAll();            //* notifica agli image collector che l'immagine è stata inserita
     }
 
     public synchronized Image getImage() throws InterruptedException {
@@ -107,6 +125,7 @@ class ImageQueue{
             wait();
         }
         Image img = images.remove(0); //* acquisisco l'immagine
+        counterPerPrior[img.prior]--;
         notifyAll();
         return img;
     }
@@ -139,6 +158,7 @@ class Vehicle extends Thread{
     LocalQueue localQueue;
     LocationTracker locationTracker;
     float x, y;
+    int nChanges = 0;
 
     public Vehicle(LocationTracker locationTracker, LocalQueue localQueue, float x, float y){
         this.locationTracker = locationTracker;
@@ -151,11 +171,10 @@ class Vehicle extends Thread{
         try{
             while(true){
                 move();
+                nChanges++;
                 int prior = locationTracker.getPrior(x, y);
                 Image img = new Image(prior, getName());
-                System.out.println(getName()+" ha creato una immagine");
                 localQueue.put(img);
-                System.out.println(getName()+" ha messo una immagine in coda locale");
                 sleep(1000);
             }
         }catch (InterruptedException e) {
@@ -184,9 +203,7 @@ class Uploader extends Thread{
         try{
             while (true){
                 Image img = localQueue.get();
-                System.out.println(getName()+" ha preso una immagine nella coda locale");
                 imageQueue.putImage(img);
-                System.out.println(getName()+" ha messo una immagine nella coda globale");
                 sleep(500);
             }
         }catch (InterruptedException e){
@@ -197,7 +214,6 @@ class Uploader extends Thread{
 
 class ImageCollector extends Thread{
     ImageQueue imageQueue;
-
     public ImageCollector(ImageQueue imageQueue) {
         this.imageQueue = imageQueue;
     }
@@ -207,7 +223,6 @@ class ImageCollector extends Thread{
         try{
             while (true){
                 imageQueue.getImage();
-                System.out.println(getName()+" ha preso una immagine dalla coda globale");
                 sleep(2000);
             }
         }catch (InterruptedException e){
