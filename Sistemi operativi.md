@@ -932,7 +932,7 @@ I task sono organizzati in un albero rosso-nero, in cui ogni nodo rappresenta un
 
 Questo garantisce un tempo di scelta del task pari a $O(log(n))$, dove n è il numero di task nella coda di ready. <br>
 
-Il virtual_runtime viene aggiornato sulla base del nice value del task (priorità statica). Il tempo effettivo di CPU viene moltiplicato per $1.25$<sup>nice</sup>:
+Il virtual_runtime viene aggiornato sulla base del nice value del task (priorità statica). Il tempo effettivo di CPU viene moltiplicato per *1.25*<sup>nice</sup>:
 
 + CPU più veloce per task ad alta priorità (nice = -20)
 + CPU più lenta per task a bassa priorità (nice = 19)
@@ -940,7 +940,7 @@ Il virtual_runtime viene aggiornato sulla base del nice value del task (priorit�
 Un task viene selezionato ed eseguito, quando verrà fermato verrà aggiornato il suo virtual_runtime e se entra nella coda ready viene inserito nell'albero RB. <br>
 I task I/O bound tendono ad usare poca CPU e quindi tendono ad
 essere selezionati prima di quelli CPU bound. <br>
-Anche il quanto di tempo assegnato dipende dal valore di nice del task: weight = $1024 / (1.25)$<sup>nice</sup>. <br>
+Anche il quanto di tempo assegnato dipende dal valore di nice del task: weight = *1024 / (1.25)*<sup>nice</sup>. <br>
 Il quanto viene calcolato sulla base di tutti gli weight dei task nella coda di ready:
 
 + **scheduling_period** = $max (n * sched_min_granularity_ns ,sched_latency_ns)$
@@ -1752,4 +1752,102 @@ Per risolvere il problema andiamo a usa una **cache Associativa**, detta anche *
 ![TLB-paginazione](images/TLB-paginazione.png)
 
 Ipotizziamo che la ricerca associatia tramite la TLB avvenga in un tempo $\epsilon$ e che l'accesso alla memoria avvenga in un tempo di 1 microsecondo. Dobbiamo definire il tasso di successi (*hit ratio*): percentuale delle volte che un numero di pagina viene trovato nei registri associativi; dipende dal numero di registri associativi. Chiamiamo questo tasso $\alpha$. <br>
-Il tempo medio di accesso alla memoria è quindi: *EAT = ( 1 + t )a + ( 2 + t )( 1-a ) = 2 + t - a*
+Il tempo medio di accesso alla memoria è quindi: *EAT = ( 1 + t )a + ( 2 + t )( 1-a ) = 2 + t - a*. <br>
+Questa soluzione è efficace perché molto spesso i riferimenti in memoria sono in sequenza, quindi se ho usato una istruzione è molto probabile che presto la riustilizzerò. Basta pensare alla lettura di un array di valori.
+
+Un altro campo che viene salvato nella tabella delle pagine è il bt di validità associato a ogni frame, che implementa la protezione della memoria. Se il bit segna **valido** allora la pagina associata è mappata nello spazio degli indirizzi logici del processo.
+
+La paginazione rende facile la **condivisione delle pagine* da parte di più processi: 
+
+![pagine-condivise](images/pagine-condivise.png)
+
++ codice condiviso: Viene condivisa una copia di sola lettura del codice tra i processi; il codice coindiviso si deve trovare nella stessa posizione nello spazio degli indirizzi logici di tutti i processi che lo condividono
++ codice/dati privati: ogni processo ha una copia separata di codice e dati e possono essere allocati in posizioni diverse dello spazio degli indirizzi logici.
+  
+Esistono varie tecniche per strutturare la tabella della pagine. Per esempio l'Intel IA32 utilizza questa struttura:
+
++ 20 bit per identificare pagina/frame (2^20 = 1M di pagine)
++ 12 bit per l'offset (2^12 = 4KB per pagina)
++ ogni elemento della tabella delle pagine usa 4 byte (20 bit per indicare il frame più un bit di validità)
+
+Ogni processo userebbe 4MB per la sua tabella delle pagine. E' decisamente troppo!
+
+Vediamo altre soluzioni. 
+
+#### Paginazione gerarchica 
+
+Divide l'indirizzo logico in tabelle delle pagine multiple. Una tecnica semplice è la tabella delle pagine a due livelli:
+
++ L'indirizzo logico (32 bit con pagine da 4K) è diviso in 2 parti:
+  + 20 bit per il numero della pagina:
+    + 10 bit per la tabella delle pagine di livello 1
+    + 10 bit per la tabella delle pagine di livello 2
+  + 12 bit per l'offset
++ L'indirizzo logo è diviso in questo modo: 
+  ![tabella-due-livelli](images/tabella-due-livelli.png)
+  dove p1 è un indice nella **tabella della pagine esterna** e p2 è lo scostamento nella tabella delle pagine esterna. <br> 
+
+segue uno schema: 
+
+![schema-tabella-due-livelli](images/schema-tabella-due-livelli.png)
+
+Gli indirizzi vengono tradotti in questo modo: 
+
+![paginazione-traduzione-indirizzi](images/paginazione-traduzione-indirizzi.png)
+
+Il vantaggio di questa tecnica è che non è necessario allocare tutta la tabella delle pagine, ma solo le parti necessarie. <br>
+
+#### Tabella delle pagine di tipo hash
+
+Questa tecnica è molto comune quando si ha a che fare con indirizzi > 32 bit, in cui la tabella delle pagine avrebbe una dimensione troppo grande. <br>
+Facciamo un esempio con 64 bit per gli indirizzi e 4k (2<sup>12</sup>), quindi 12 bit per offset e 52 bit per il numero di pagina; questo porta a una tabella da *2<sup>52</sup>***4 = 16384TB*. <br>
+Usa una tabella hash per associare al numero di pagina il frame. Ogni riga della tabella hash contiene una catena di elementi che hanno lo stesso valore hash. Il numero di pagina viene comparato con gli elementi della catiena fno a trovare il frame associato alla pagina: 
+
+![paginazione-hash-table](images/paginazione-hash-table.png)
+
+In questo caso **l'utilizzo della TLB è fondamentale**, in quanto vengono effettuati molti accessi alla memoria. 
+
+#### Tabella delle pagine invertite
+
+In questo caso la tabella contiene una riga per ogni pagina reale in memoria. Nella riga associata a un frame troviamo il numero di pagina mappato in quel frame e le informazioni sul processo che possiane la pagina (pid)
+
+![tabella-pagine-invertita](images/tabella-pagine-invertita.png)
+
+Questa tecnica diminuisce la memoria necessaria per memorizzare ogni tabella delle pagine (la dimensione è legata alla dimensione della memoria fisica) ma incrementa il tempo di ricerca, in quanto prevede un'unica tabella per tutti i processi.
+Per ridurre il tempo di ricerca si può usare una **tabella hash**. <br>
+Questa tecnica rende difficile gestire la condivisione delle pagine, in quanto non si può sapere quanti processi condividono una pagina. <br> 
+
+La tabelle delle pagine è usata del processore! Il sistema operativo non c'etnra nulla, lui deve solo allocare i processi e creare la tabelle delle pagine. <br>
+Nel context switch il sistema operativo deve cambiare le informazioni relative alla gestione della memoria, ovvero deve cambiare il PTBR e, se possibile, la TLB. Bisogna quindi notare che, nello schedulare i thread dei processi, può essere conveniente schedulare i thread dello stesso processo in modo da non dover cambiare tutte le volte la TLB, visto che condividono lo spazio di memoria.
+
+### Segmentazione paginata
+
+![segmentazione-paginata](images/segmentazione-paginata.png)
+
+Questa tecnica è usata dai processori intel IA32. In questo caso l'indirizzo logico è diviso in tre parti:
+
++ selector: indica il segmento
++ offset: indica l'indirizzo all'interno del segmento
+
+Da questo indirizzo ne viene generato un altro intermedio, che viene poi paginato.
+
+### Architettura intel IA32
+
+![architettura-intel](images/architettura-intel.png)
+
+La segmentazione permette di identificare 16K segmenti di cui :8K locali del processo (Local Descriptor Table - LDt) e 8K globali del sistema (Global Descriptor Table - GDT). Ciasciun elemento di queste due tabelle usa 8 byte e contiene informazioni come l'indirizzo di base, il limite...
+L'indirizzo logico è così suddiviso:
+
++ **selettore del segmento**: 13 bit per l'id del segmento; 1 bit che indica se il segmento appartiene alla LDT o alla GDT; 2 bit che indicano il livello di privilego di accesso del segmento.
++ **offset**: 32 bit per l'offset
+
+Per la paginazione si usa una tabella delle pagine a due livelli:
+
++ 10 bit per la directory delle pagine 
++ 10 bit per l'offset nella directory delle pagine
++ 12 bir per l'offset nella pagina
+
+Si possono avere pagine da 4KB o d 4MB (questo attributo è indicato da un flag detto PageSize, nella directory delle pagine)
+Con 32 bit si possono codificare 4GB di memoria, che non è abbastanza. Per questo viene introdotta La Page Address Extension, una paginazione su 3 livelli (2 bit, 9 bit, 9 bit, 12 bit). La tabella delle pagine in questo caso usa 24 bit per identificare il frame, portando il limite superiore della memoria a 64GB.
+
+Ci sono altre rchitetture come la ARM e l'Architettura x86 a 64 bit. Vedere le slide. 
