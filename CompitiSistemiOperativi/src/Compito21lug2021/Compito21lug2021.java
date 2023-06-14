@@ -142,7 +142,7 @@ class WorkerThread extends Thread{
                 nReq++;
                 sleep(2000);
             }
-        }catch (InterruptedException e){
+        }catch(InterruptedException e){
         }
     }
 }

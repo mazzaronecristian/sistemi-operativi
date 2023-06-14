@@ -141,9 +141,7 @@ class ArrayQueue{
             queue.add(singleArray);
             Arrays.fill(caricato, false);
         }
-
     }
-
 
     public synchronized int[] getResults() throws InterruptedException {
         while(queue.size() == 0)
@@ -171,7 +169,7 @@ class Generator extends Thread{
                 sleep(time);
                 queue.putMessage(message);
                 nMess++;
-                System.out.println(getName()+"carica un messaggio");
+                System.out.println(getName()+" carica un messaggio");
             }
         }catch (InterruptedException e){
         }
