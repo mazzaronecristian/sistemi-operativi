@@ -15,17 +15,20 @@ public class Compito13set2021 {
 
         for( int i = 0; i < generators.length; i++ ){
             generators[i] = new Generator( i, midQueue );
+            generators[i].setName("G["+i+"]");
             generators[i].start();;
         }
 
         for( int i = 0; i < processors.length; i++ ){
             processors[i] = new Processor( midQueue, outQueue );
+            processors[i].setName("P["+i+"]");
             processors[i].start();;
         }
 
+        extractor.setName("E");
         extractor.start();
 
-        Thread.sleep(30000);
+        Thread.sleep(10000);
 
         for( int i = 0; i < generators.length; i++ ){
             generators[i].interrupt();
@@ -47,6 +50,12 @@ class Message{
     public Message(int p, int value){
         this.p = p;
         this.value = value;
+    }
+
+    //* costruttore di copia
+    public Message(Message msg){
+        this.p = msg.p;
+        this.value = msg.value;
     }
 }
 
@@ -71,14 +80,16 @@ class MidQueue{
         while ( full != messages.length){
             wait();
         }
-        Message[] o = messages;
-        for( int i= 0; i < messages.length; i++ ) //* azzero l'array dopo averlo copiato
-            messages[i] = null;{
+        Message[] msg = new Message[messages.length];   //* ho istanziato un array vuoto lungo tanto quanto messages
+        for(int i = 0; i < messages.length; i++){       //* richiamo il costruttore di copia su ogni singolo messaggio di messages[]
+            msg[i] = new Message(messages[i]);
         }
-        System.out.println("MidQueue svuotata");
+
+        messages = new Message[msg.length];             //* pulisco l'array messages
         full = 0;
+        System.out.println("MidQueue svuotata");
         notifyAll();
-        return o;
+        return msg;
     }
 }
 
@@ -125,7 +136,7 @@ class Generator extends Thread{
                 int value = ( id * 100 + p );
                 Message m = new Message(p, value);
                 midQueue.putMessage(m, id);
-                System.out.println("Gen"+id+" ha generato p:"+p+" value:"+value);
+                System.out.println("Gen"+id+" ha generato p: "+p+" value: "+value);
                 sleep((int)(Math.random()*900)+100);  //* aspetta tra 100 e 1000 ms
                 p++;
             }
@@ -157,7 +168,7 @@ class Processor extends Thread{
                 }
                 result = new Message(p, sum);
                 outQueue.putResult(result);
-                System.out.println("caricato p:"+p+" sum:"+sum);
+                System.out.println("caricato p: "+p+" sum: "+sum);
                 sleep((int)(Math.random()*900)+100);
             }
         } catch (InterruptedException e) {
@@ -178,7 +189,7 @@ class Extractor extends Thread{
         try{
             while(true){  //* estrae i risultati in ordine secondo p
                 Message result = outQueue.getResult(pPrev);
-                System.out.println("Stampo valore p:"+result.p+" value: "+result.value);
+                System.out.println("Stampo valore p: "+result.p+" value: "+result.value);
                 pPrev++;
             }
         }catch (InterruptedException e){
