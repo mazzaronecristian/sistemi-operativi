@@ -6,21 +6,21 @@ public class Compito13set2021 {
     public static void main(String[] args) throws InterruptedException {
         int n = 5;
         int m = 10;
-        MidQueue midQueue = new MidQueue(n);
+        MidQueue midQueue = new MidQueue( n );
         OutQueue outQueue = new OutQueue();
 
-        Generator[] generators = new Generator[n];
-        Processor[] processors = new Processor[m];
-        Extractor extractor = new Extractor(outQueue);
+        Generator[ ] generators = new Generator[ n ];
+        Processor[ ] processors = new Processor[ m ];
+        Extractor extractor = new Extractor( outQueue );
 
         for( int i = 0; i < generators.length; i++ ){
             generators[i] = new Generator( i, midQueue );
-            generators[i].start();;
+            generators[i].start();
         }
 
         for( int i = 0; i < processors.length; i++ ){
             processors[i] = new Processor( midQueue, outQueue );
-            processors[i].start();;
+            processors[i].start();
         }
 
         extractor.start();
@@ -59,10 +59,10 @@ class MidQueue{
     }
 
     public synchronized void putMessage(Message m, int id) throws InterruptedException {
-        while( messages[id] != null){
+        while( messages[ id ] != null){
             wait();
         }
-        messages[id] = m;
+        messages[ id ] = m;
         full++;
         notifyAll();
     }
