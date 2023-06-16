@@ -20,11 +20,13 @@ public class Compito10gen2022 {
 
         banco.setName("B");
         banco.start();
-
+        for (Giocatore giocatore : giocatori) giocatore.join();
         banco.join();
 
         double totale = banco.borsellino;
+        System.out.println("borsellino banco: "+banco.borsellino);
         for (int i = 0; i < n; i++){
+            System.out.println("borsellino giocatore: "+giocatori[i].borsellino);
             totale += giocatori[i].borsellino;
             System.out.print(giocatori[i].getName()+" ha vinto "+ giocatori[i].nVincite+ " volte");
         }
@@ -65,9 +67,11 @@ class Tavolo{
         System.out.println("scommessa fatta "+bet.idGiocatore);
         notifyAll();
     }
-
+    public synchronized int getSize(){
+        return bets.size();
+    }
     public synchronized ArrayList<Bet> getBets() throws InterruptedException {
-        while(bets.size()<nGiocatori){
+        while(getSize()<nGiocatori){
             System.out.println("banco in attesa");
             wait();
         }
@@ -141,7 +145,7 @@ class Giocatore extends Thread{
 class Banco extends Thread{
     Tavolo tavolo;
 
-    float borsellino = 0;
+    double borsellino = 0;
     int numeroVincente;
     double[] vincite;
 
@@ -157,15 +161,16 @@ class Banco extends Thread{
     @Override
     public void run() {
         try {
-            while (true){
+            while (!fine){
                 numeroVincente = (int)(Math.random()*100+1);            //* genera il numero vincente
                 ArrayList<Bet> bets = tavolo.getBets();                 //* prende le puntate dei giocatori
                 System.out.println(bets.size());
                 if(bets.size() == 0) {
-                    break;
+                    fine = true;
                 }
                 ArrayList<Integer> vincitori = new ArrayList<>();
                 double tot = getTotGiocate(bets);                        //* somma totale puntata dai giocatori
+                System.out.println("borsellino banco: "+(borsellino));
                 int minDist = 99;
                 for(Bet b : bets){
                     if(b.target <= numeroVincente){
@@ -179,14 +184,14 @@ class Banco extends Thread{
                             vincitori.add(b.idGiocatore);               //* aggiungo un altro vincitore
                     }
                 }
-                if(vincitori.size() == 0)                               //* nessuno ha vinto, allora
+                if(vincitori.size() == 0) {                               //* nessuno ha vinto, allora
                     borsellino += tot;                                  //* vince il banco (prende tutte le puntate)
-                else {
-                    int nVincitori = vincitori.size();
-                    tot /= nVincitori;                                  //* divido il totale per il numero di vincitori
-                    for(int x: vincitori){                              //* assegno a ogni vincitore la propria vincita
-                        vincite[x] = tot;
-                    }
+                } else {
+                        int nVincitori = vincitori.size();
+                        tot /= nVincitori;                                  //* divido il totale per il numero di vincitori
+                        for(int x: vincitori){                              //* assegno a ogni vincitore la propria vincita
+                            vincite[x] = tot;
+                        }
                 }
                 tavolo.putVincite(vincite);
                 Arrays.fill(vincite, 0);
