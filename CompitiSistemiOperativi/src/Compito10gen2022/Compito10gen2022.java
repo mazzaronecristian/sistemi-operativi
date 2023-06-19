@@ -164,7 +164,6 @@ class Banco extends Thread{
             while (!fine){
                 numeroVincente = (int)(Math.random()*100+1);            //* genera il numero vincente
                 ArrayList<Bet> bets = tavolo.getBets();                 //* prende le puntate dei giocatori
-                System.out.println(bets.size());
                 if(bets.size() == 0) {
                     fine = true;
                 }
@@ -184,12 +183,12 @@ class Banco extends Thread{
                             vincitori.add(b.idGiocatore);               //* aggiungo un altro vincitore
                     }
                 }
-                if(vincitori.size() == 0) {                               //* nessuno ha vinto, allora
+                if(vincitori.size() == 0) {                             //* nessuno ha vinto, allora
                     borsellino += tot;                                  //* vince il banco (prende tutte le puntate)
                 } else {
                         int nVincitori = vincitori.size();
-                        tot /= nVincitori;                                  //* divido il totale per il numero di vincitori
-                        for(int x: vincitori){                              //* assegno a ogni vincitore la propria vincita
+                        tot /= nVincitori;                              //* divido il totale per il numero di vincitori
+                        for(int x: vincitori){                          //* assegno a ogni vincitore la propria vincita
                             vincite[x] = tot;
                         }
                 }
