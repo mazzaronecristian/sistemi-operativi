@@ -1,7 +1,7 @@
 package Compito13apr2023;
 
-import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.Semaphore;
 
 public class Compito13apr2023 {
@@ -121,30 +121,23 @@ class ResourceMng {
     public void relRes(int idW) throws InterruptedException {
         int n = 0;
         for(int i = 0; i < resources.length; i++){  //todo: fixme!!!
-            if(resources[i].idOwner == idW) {
+            if(Objects.equals(resources[i].idOwner, idW)) {
                 resources[i].available = true;
                 n++;
-
             }
-
-            System.out.println("traccia");
         }
         available.release(n);
-
-
     }
 
     private int getMinUsed(){
         int pos = 0;
 
         for(int i= 0; i < resources.length; i++){
-
             if (resources[i].available){
                 if (resources[i].nUse < resources[pos].nUse) {
                     pos = i;
                 }
             }
-
         }
         return pos;
     }
