@@ -38,6 +38,7 @@ public class Compito20giu2023RosadiniG{
 
         int totGen = 0; //* variabile per totale di messaggi generati dai Threads
 
+        //*interruzione di tutti i Threads e stampa delle statistiche
         for( int i = 0; i < generators.length; i++ ){
             generators[i].interrupt();
             generators[i].join();
@@ -103,33 +104,33 @@ class LimQueue{
 }
 
 class OutputMng {
-    int[] results;  //! provare con un array di Integer e confronto con null dentro putResult
+    Integer[] results;  //* nel compito ho fatto un array di int[] anzichè di Integer
     int m;
     int idW; //* per indirizzare l'array di results
     Semaphore mutex = new Semaphore(1);
     Semaphore piene = new Semaphore(0);
     Semaphore vuote; //* serve??
     public OutputMng(int m){
-        results = new int[m];
+        results = new Integer[m];
         vuote= new Semaphore(m);
         this.m = m;
     }
     public void putResult(int r, int idW) throws InterruptedException{
         mutex.acquire();    //* attendo il mutex
-        //! FIXME
-        if( results[idW] != 0 ){    //* errore: nel compito ho comparato con null
-            mutex.release();        //! funziona? se il result potrebbe essere = 0 no
+        if( results[idW] != null ){
+            mutex.release();
+            Thread.sleep(200);
         }else{
             results[idW] = r;
             mutex.release();
             piene.release();
         }
     }
-    public int[] getResults() throws InterruptedException{
+    public Integer[] getResults() throws InterruptedException{
         piene.acquire(m);
         mutex.acquire();
-        int[] temp = results;
-        results = new int[m]; //! se li inizializza tutti a zero poi non funziona il putResult
+        Integer[] temp = results;
+        results = new Integer[m]; //* inizializza l'array a null
         mutex.release();
         return temp;
     }
@@ -184,7 +185,7 @@ class WorkerThread extends Thread{
                 int result = 0;
                 for(Message m : mm)
                     result += m.value;              //* sommo tutti i value
-                sleep((int)(Math.random()*d+t));    //* nel compito mi sono dimenticato una parentesi
+                sleep((int)(Math.random()*d+t));    //* nel compito mi sono dimenticato una parentesi dopo il cast
                 om.putResult(result, idW);
                 nWork++;
             }
@@ -194,11 +195,11 @@ class WorkerThread extends Thread{
 
 class OutputThread extends Thread{
     OutputMng om;
-    int[] results;
+    Integer[] results;
     int nPrints = 0;
     public OutputThread(OutputMng om, int m){
         this.om = om;
-        results = new int[m];
+        results = new Integer[m];
     }
     public void run() {
         try{
