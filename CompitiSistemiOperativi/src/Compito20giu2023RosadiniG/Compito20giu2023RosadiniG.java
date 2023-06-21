@@ -6,14 +6,14 @@ import java.util.concurrent.Semaphore;
 
 public class Compito20giu2023RosadiniG{
     public static void main(String[] args) throws InterruptedException {
-        int n = 10;
-        int m = 5;
-        int l = 4;
-        int t = 100;
-        int d = 900;
-        int x = 100;
+        int n = 10;     //* n° di Generators
+        int m = 5;      //* n° di Workers
+        int l = 20;     //* dimensione coda limitata
+        int x = 100;    //* tempo di attesa tra la generazione di un messaggio e l'altro
+        int t = 100;    //* tempo minimo di elaborazione
+        int d = 900;    //* incremento massimo del tempo di elaborazione
 
-        //* risorse condivise
+        //* creazione risorse condivise
         LimQueue lq = new LimQueue(l, n);
         OutputMng om = new OutputMng(m);
 
@@ -31,6 +31,7 @@ public class Compito20giu2023RosadiniG{
         OutputThread[] ot = new OutputThread[2];
         for( int i = 0; i < ot.length; i++){
             ot[i] = new OutputThread(om, m);
+            ot[i].setName("OutputT"+i);
             ot[i].start();
         }
 
@@ -39,24 +40,26 @@ public class Compito20giu2023RosadiniG{
         int totGen = 0; //* variabile per totale di messaggi generati dai Threads
 
         //*interruzione di tutti i Threads e stampa delle statistiche
+        System.out.println();
         for( int i = 0; i < generators.length; i++ ){
             generators[i].interrupt();
             generators[i].join();
-            System.out.print("G"+i+" ha generato "+generators[i].nGen+" messaggi. ");
+            System.out.println("G"+i+" ha generato "+generators[i].nGen+" messaggi. ");
             totGen += generators[i].nGen;
         }
-        System.out.println();
         System.out.println("Tot messaggi generati:"+totGen);
+
+        System.out.println();
         for( int i = 0; i < workers.length; i++ ){
             workers[i].interrupt();
             workers[i].join();
-            System.out.print("W"+i+" ha elaborato "+workers[i].nWork+" risultati. ");
+            System.out.println("W"+i+" ha elaborato "+workers[i].nWork+" risultati. ");
         }
         System.out.println();
         for( int i = 0; i < ot.length; i++){
             ot[i].interrupt();
             ot[i].join();
-            System.out.print("OT"+i+" ha stampato "+ot[i].nPrints+" volte. ");
+            System.out.print("OutputThread"+i+" ha stampato "+ot[i].nPrints+" volte. ");
         }
     }
 }
@@ -81,58 +84,58 @@ class LimQueue{
         this.n = n;
     }
     public void putMessage(Message m) throws InterruptedException{
-        vuote.acquire();    //* decremento una posizione vuota nella coda
-        mutex.acquire();    //* attendo il mutex
-        queue.add(m);       //* aggiungo il messaggio m alla coda
-        mutex.release();    //* rilascio mutex
-        piene.release();    //* incremento una posizione piena
+        vuote.acquire();        //* decremento una posizione vuota nella coda
+        mutex.acquire();        //* attendo il mutex
+        queue.add(m);           //* aggiungo il messaggio m alla coda
+        mutex.release();        //* rilascio mutex
+        piene.release();        //* incremento una posizione piena
     }
 
     public Message[] getNMessages() throws InterruptedException{
-        piene.acquire(n);
+        piene.acquire(n);                       //* attendo che n posizioni siano piene
         mutex.acquire();
-        //* Errore: nel compito non ho scorso tutto l'array e copiato valore per valore
+        //* Errore: nel compito NON ho scorso tutto l'array e copiato valore per valore
         //* ma ho fatto semplicemente:
         //* Message[] temp = queue.remove(n);
-        Message[] temp = new Message[n];
-        for(int i = 0; i < n; i++ )
-            temp[i] = queue.remove(0);
-        mutex.release();
-        vuote.release(n);
+        Message[] temp = new Message[n];        //* creo un array di n Message
+        for(int i = 0; i < n; i++ )             //* scorro tutto l'array
+            temp[i] = queue.remove(0);    //* copio valore per valore
+        mutex.release();                        //* rilascio mutex
+        vuote.release(n);                       //* incremento n posizioni vuote
         return temp;
     }
 }
 
 class OutputMng {
-    Integer[] results;  //* nel compito ho fatto un array di int[] anzichè di Integer
+    Integer[] results;  //* nel compito ho fatto un array di int[] anzichè di Integer[]
     int m;
-    int idW; //* per indirizzare l'array di results
+    //* nel compito ho aggiunto l'attributo int idW; che non serve, perchè il worker, che userà putResult, conosce già il suo id
     Semaphore mutex = new Semaphore(1);
+    //* ogni volta che un worker inserisce un risultato, incrementa una posizione piena
+    //* poi, l'OutPutThread, attende m risultati, preleva tutto l'array e decrementa m posizioni piene
     Semaphore piene = new Semaphore(0);
-    Semaphore vuote; //* serve??
+    //* nel compito mi sono scordato di cancellare il semaforo vuote=new Semaphore(m); che non serve
     public OutputMng(int m){
         results = new Integer[m];
-        vuote= new Semaphore(m);
         this.m = m;
     }
     public void putResult(int r, int idW) throws InterruptedException{
-        mutex.acquire();    //* attendo il mutex
-        if( results[idW] != null ){
-            mutex.release();
-            Thread.sleep(200);
-        }else{
-            results[idW] = r;
-            mutex.release();
-            piene.release();
+        mutex.acquire();             //* attendo il mutex
+        if( results[idW] != null ){  //* se la posizione è occupata
+            mutex.release();         //* rilascio il mutex
+        }else{                       //* altrimenti
+            results[idW] = r;        //* inserisco il risultato
+            mutex.release();         //* rilascio il mutex
+            piene.release();         //* incremento una posizione piena
         }
     }
     public Integer[] getResults() throws InterruptedException{
-        piene.acquire(m);
-        mutex.acquire();
-        Integer[] temp = results;
-        results = new Integer[m]; //* inizializza l'array a null
-        mutex.release();
-        return temp;
+        piene.acquire(m);            //* attendo che m posizioni siano piene
+        mutex.acquire();             //* attendo il mutex
+        Integer[] temp = results;    //* copio l'array di risultati
+        results = new Integer[m];    //* inizializza l'array result a null
+        mutex.release();             //* rilascio il mutex
+        return temp;                 //* ritorno l'array di risultati
     }
 }
 
@@ -142,19 +145,18 @@ class GeneratorThread extends Thread{
     int value = 1;
     int nGen = 0;   //* numero messaggi generati
     int x;
-
     public GeneratorThread(LimQueue lq, int idG, int x) {
         this.lq = lq;
         this.idG = idG;
         this.x = x;
     }
-
     public void run(){
         try{
-            while (true){
+            while(true){
                 Message m = new Message(idG, value);
                 value++;
-                lq.putMessage(m);
+                lq.putMessage(m);   //* inserisco il messaggio nella coda e incremento nGen
+                nGen++;             //* nel compito mi sono scordato di incrementare nGen
                 sleep(x);
             }
         }catch (InterruptedException e) {}
@@ -169,7 +171,6 @@ class WorkerThread extends Thread{
     int nWork = 0;
     int t;
     int d;
-
     public WorkerThread(LimQueue lq, OutputMng om, int idW, int n, int t, int d) {
         this.lq = lq;
         this.om = om;
@@ -205,7 +206,8 @@ class OutputThread extends Thread{
         try{
             while(true){
                 results = om.getResults();
-                System.out.println("Array: "+Arrays.toString(results)); //* nel compito ho scritto male il metodo per mancanza di spazio nel foglio
+                System.out.println(getName()+" stampa l'array: "+Arrays.toString(results)); //* nel compito ho scritto male il metodo per mancanza di spazio nel foglio
+                nPrints++;
             }
         }catch (InterruptedException e ){}
     }
