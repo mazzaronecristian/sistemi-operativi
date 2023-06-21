@@ -121,8 +121,9 @@ class OutputMng {
     }
     public void putResult(int r, int idW) throws InterruptedException{
         mutex.acquire();             //* attendo il mutex
-        if( results[idW] != null ){  //* se la posizione è occupata
+        if( results[idW] != null ){  //* se la posizione è occupata da un valore intero
             mutex.release();         //* rilascio il mutex
+            //* nel compito ho messo il break, ma non serve, non è un ciclo
         }else{                       //* altrimenti
             results[idW] = r;        //* inserisco il risultato
             mutex.release();         //* rilascio il mutex
@@ -155,8 +156,8 @@ class GeneratorThread extends Thread{
             while(true){
                 Message m = new Message(idG, value);
                 value++;
-                lq.putMessage(m);   //* inserisco il messaggio nella coda e incremento nGen
                 nGen++;             //* nel compito mi sono scordato di incrementare nGen
+                lq.putMessage(m);   //* inserisco il messaggio nella coda e incremento nGen
                 sleep(x);
             }
         }catch (InterruptedException e) {}
@@ -187,8 +188,8 @@ class WorkerThread extends Thread{
                 for(Message m : mm)
                     result += m.value;              //* sommo tutti i value
                 sleep((int)(Math.random()*d+t));    //* nel compito mi sono dimenticato una parentesi dopo il cast
-                om.putResult(result, idW);
                 nWork++;
+                om.putResult(result, idW);
             }
         }catch (InterruptedException e){}
     }
@@ -206,7 +207,8 @@ class OutputThread extends Thread{
         try{
             while(true){
                 results = om.getResults();
-                System.out.println(getName()+" stampa l'array: "+Arrays.toString(results)); //* nel compito ho scritto male il metodo per mancanza di spazio nel foglio
+                //* nel compito ho scritto male il metodo toString() per mancanza di spazio nel foglio
+                System.out.println(getName()+" stampa l'array: "+Arrays.toString(results));
                 nPrints++;
             }
         }catch (InterruptedException e ){}
