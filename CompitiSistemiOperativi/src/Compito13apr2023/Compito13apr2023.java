@@ -120,7 +120,7 @@ class ResourceMng {
     }
     public void relRes(int idW) throws InterruptedException {
         int n = 0;
-        for(int i = 0; i < resources.length; i++){  //todo: fixme!!!
+        for(int i = 0; i < resources.length; i++){
             if(Objects.equals(resources[i].idOwner, idW)) {
                 resources[i].available = true;
                 resources[i].idOwner = null;
