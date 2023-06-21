@@ -1,16 +1,15 @@
 package Compito09giu2023;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Compito09giu2023 {
     public static void main(String[] args) throws InterruptedException{
         int l = 4;
-        int m = 1;
+        int m = 5;
         int n = 10;
-        int t = 2000;
-        LimitedQueue limQueue = new LimitedQueue(l, m);
-        ArrayQueue arrQueue = new ArrayQueue(m);
+        int t = 10;
+        LimQueue limQueue = new LimQueue(l, m);
+        UnlimQueue arrQueue = new UnlimQueue(m);
 
         Generator[] gen = new Generator[n];
         Worker[] work = new Worker[m];
@@ -22,17 +21,18 @@ public class Compito09giu2023 {
         }
 
         for (int i = 0; i<work.length;i++){
-            work[i] = new Worker(i, limQueue, arrQueue, t);
+            work[i] = new Worker(i+1, limQueue, arrQueue, t);
             work[i].setName("W"+i);
             work[i].start();
         }
 
         printer.start();
         Thread.sleep(10000);
+
         for(Worker w:work){
             w.interrupt();
             w.join();
-            System.out.println(w.getName()+" ha prodotto "+ w.nRes+ " risultati");
+            System.out.println(w.getName()+" ha prodotto "+ w.nReq + " risultati");
         }
         int messaggi = 0;
         for(Generator g:gen){
@@ -46,117 +46,113 @@ public class Compito09giu2023 {
         printer.join();
         System.out.println("sono stati stampati "+ printer.nPrint+" array");
 
-        int rimanenti = 0;
-        for (int r: limQueue.queue){
-            if(r!=0)
-                rimanenti++;
-        }
 
-        System.out.println("rimangono "+ rimanenti+" messaggi");
-
-
+        System.out.println("rimangono "+ limQueue.queue.size()+" messaggi nella coda limitata e "+ arrQueue.unlQueue.size()+ " nella coda illimitata");
     }
 }
 
-class LimitedQueue{
-    int[] queue;
-    int[] nAcquisizioni;    //* Ogni slot nella coda ha un numero di acquisizioni.
-                            //* Se un Worker trova tutti zeri, sceglie quale prendere, altrimenti prende l'unico diverso da 0
-    int m, nMess = 0;
-    public LimitedQueue(int l, int m){
-        queue = new int[l];
-        nAcquisizioni = new int[l];
-        for(int i = 0; i<l; i++) {
-            queue[i] = 0;
-            nAcquisizioni[i] = 0;
-        }
-        this.m = m;
+class Message{
+    int idG;
+    int idW;
+    int value;
+
+    public Message(int idG, int value) {
+        this.idG = idG;
+        this.value = value;
     }
-    public synchronized void putMessage(int message) throws InterruptedException {
-        while (nMess == queue.length)
+}
+
+class LimQueue {
+    ArrayList<Message> queue = new ArrayList<>();
+    int l;
+    boolean[] checkTaken;       //* Worker[i] aspetterà se checkTaken[i] == true
+    int nMess = 0;              //* num tot di messaggi comunicati
+
+    public LimQueue(int l, int m) {
+        this.l = l;
+        checkTaken = new boolean[m];  //* java lo inizializza già a false
+    }
+    public synchronized void putMessage(Message m) throws InterruptedException {
+        while ( queue.size() == l )
             wait();
-        int pos = 0;
-        while(queue[pos]!=0)
-            pos++;
-        queue[pos] = message;
+        queue.add(m);
         nMess++;
         notifyAll();
     }
-    public synchronized int getMessage() throws InterruptedException {
-        while(nMess == 0)
+    public synchronized Message getMessage(int idW) throws InterruptedException {
+        while (queue.size() == 0)     //* aspetta se la coda è vuota oppure se quel worker ha già preso il mess
             wait();
-        int pos;
-        for (pos = 0; pos< nAcquisizioni.length; pos++){
-            if(nAcquisizioni[pos] != 0)
-                break;
+        checkTaken[idW-1] = true;
+        Message m = queue.get(0);
+        if (isTrue()){
+            checkTaken = new boolean[checkTaken.length];
+            queue.remove(0);
         }
-        if(pos == nAcquisizioni.length) {
-            pos = (int) (Math.random() * nAcquisizioni.length);
-            nAcquisizioni[pos]++;
-            return queue[pos];
-        }else{
-            nAcquisizioni[pos]++;
-            int value = queue[pos];
-            if (nAcquisizioni[pos] == m){
-                queue[pos] = 0;
-                nMess--;
-            }
-            return value;
-        }
+        notifyAll();
+        return m;
     }
-
-    public boolean isEmpty(){
-        int sum = 0;
-        for(int x: queue)
-            sum += x;
-        return sum == 0;
+    private boolean isTrue() {
+        boolean check = true;
+        for(boolean c : checkTaken){
+            if(!c) {
+                check = false;
+                break;
+            }
+        }
+        return check;
+    }
+    public synchronized void wait(int idW) throws InterruptedException {
+        while (checkTaken[idW-1])
+            wait();
     }
 }
 
-class ArrayQueue{
-    ArrayList<int[]> queue = new ArrayList<>();
-    int[] singleArray;
-    boolean[] caricato;     //* ogni worker ha il suo slot in caricato. caricato[i]=false se worker[i] non ha ancora caricato il messaggio
-                            //* se caricato = true per ogni i, allora tutti i roekr hanno caricato lo stesso messaggio
+class UnlimQueue{
+    ArrayList<Message[]> unlQueue = new ArrayList<>();
+    Message[] results;
+    public UnlimQueue(int m){
+        results = new Message[m];
+    }
 
-    public ArrayQueue(int m){
-        singleArray = new int[m];
-        caricato = new boolean[m];
-        for(int i = 0; i< m; i++){
-            caricato[i] = false;
+    public synchronized void putResults(Message m) throws InterruptedException {
+        results[m.idW-1] = m;
+        if(isComplete()){
+            unlQueue.add(results);
+            results = new Message[results.length];
+            notifyAll();
         }
     }
-    public synchronized void putResults(int result, int id) throws InterruptedException {
-        while(caricato[id])
+
+    public synchronized void wait(int idW) throws InterruptedException {
+        while (results[idW-1] != null)
             wait();
-        singleArray[id] = result;
-        boolean finito = true;
-        for(boolean x: caricato)
-            if(!x){
-                finito = false;
+    }
+
+    private boolean isComplete() {
+        boolean check = true;
+        for (Message x : results) {
+            if (x == null) {
+                check = false;
                 break;
             }
-
-        if(finito){
-            queue.add(singleArray);
-            Arrays.fill(caricato, false);
         }
+        return check;
     }
 
-    public synchronized int[] getResults() throws InterruptedException {
-        while(queue.size() == 0)
+    public synchronized Message[] getResults() throws InterruptedException {
+        while(unlQueue.size() == 0)
             wait();
-        return queue.remove(0);
+        return unlQueue.remove(0);
     }
 }
 
 class Generator extends Thread{
     int id;
     int time;       //* tempo di attesa
-    LimitedQueue queue;
+    LimQueue queue;
     int nMess = 0;
 
-    public Generator(int id, int time, LimitedQueue queue) {
+    public Generator(int id, int time, LimQueue queue) {
         this.time = time;
         this.queue = queue;
         this.id = id;
@@ -165,11 +161,10 @@ class Generator extends Thread{
     public void run() {
         try{
             while (true){
-                int message = id * 100 + 1;
+                Message msg = new Message(id, id*100+1);
+                queue.putMessage(msg);
                 sleep(time);
-                queue.putMessage(message);
                 nMess++;
-                System.out.println(getName()+" carica un messaggio");
             }
         }catch (InterruptedException e){
         }
@@ -178,11 +173,11 @@ class Generator extends Thread{
 
 class Printer extends Thread{
     int[] results;
-    ArrayQueue queue;
+    UnlimQueue queue;
 
     int nPrint;
 
-    public Printer(int m, ArrayQueue queue) {
+    public Printer(int m, UnlimQueue queue) {
         this.results = new int[m];
         this.queue = queue;
     }
@@ -190,12 +185,14 @@ class Printer extends Thread{
     @Override
     public void run() {
         try{
-            while (true){
-                results = queue.getResults();
-                for (int x : results)
-                    System.out.print(x+" ");
-                System.out.println();
-                sleep(100);
+            while (true) {
+                Message[] messages = queue.getResults();
+
+                System.out.print("array di risultati: [ ");
+                for(Message m: messages)
+                    System.out.print(m.value+" ");
+                System.out.println("]");
+                nPrint++;
             }
         }catch (InterruptedException e){
         }
@@ -204,14 +201,14 @@ class Printer extends Thread{
 
 class Worker extends Thread{
     int id, t;
-    LimitedQueue messages;
-    ArrayQueue arrOfResults;
+    LimQueue limQueue;
+    UnlimQueue unlimQueue;
 
-    int nRes = 0;
+    int nReq = 0;
 
-    public Worker(int id, LimitedQueue messages, ArrayQueue arrOfResults, int t) {
-        this.messages = messages;
-        this.arrOfResults = arrOfResults;
+    public Worker(int id, LimQueue limQueue, UnlimQueue unlimQueue, int t) {
+        this.limQueue = limQueue;
+        this.unlimQueue = unlimQueue;
         this.id = id;
         this.t = t;
     }
@@ -220,13 +217,20 @@ class Worker extends Thread{
     public void run() {
         try{
             while (true){
-                int result = id*messages.getMessage(); //* messaggio elaborato
-                sleep((int)(Math.random()*t*t + t));
-                arrOfResults.putResults(result, id);
-                nRes++;
-                System.out.println(getName()+"carica un risultato");
+                limQueue.wait(id);
+
+                Message m = limQueue.getMessage(id);
+
+                int time = (int)( Math.random()*t*t+t);
+                sleep( time );
+
+                m.value *= id;
+                m.idW = id;
+
+                nReq++;
+                unlimQueue.wait(id);
+                unlimQueue.putResults(m);
             }
-        }catch (InterruptedException e){
-        }
+        }catch (InterruptedException e){}
     }
 }
