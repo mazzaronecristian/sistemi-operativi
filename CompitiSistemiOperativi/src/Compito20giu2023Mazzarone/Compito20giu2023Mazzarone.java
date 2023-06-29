@@ -68,8 +68,8 @@ class Messaggio{
 }
 class CodaLimitata{
     Semaphore mutex = new Semaphore(1);
-    Semaphore libere;
-    Semaphore piene = new Semaphore(0);
+    Semaphore libere;                           //* numero di posizioni libere nella coda
+    Semaphore piene = new Semaphore(0); //* numero di messaggi disponibili nella coda
 
     List<Messaggio> messaggi = new ArrayList<>();
 
@@ -80,22 +80,24 @@ class CodaLimitata{
     public void caricaMessaggio(Messaggio msg) throws InterruptedException {
         libere.acquire();
         mutex.acquire();
+
         messaggi.add(msg);
+
         mutex.release();
         piene.release();
     }
 
     public Messaggio[] prendiMessaggi(int n) throws InterruptedException {
-        Messaggio[] msg = new Messaggio[n];          //* nello scritto ho fatto un errore di sintassi,
-                                                     //* scrivendo Messaggio msg[] = ...
-        piene.acquire(n);
+        Messaggio[] msg = new Messaggio[n];         //* nello scritto ho fatto un errore di sintassi,
+                                                    //* scrivendo Messaggio msg[] = ...
+        piene.acquire(n);                           //* un worker aspetta che ci siano almeno n messaggi
         mutex.acquire();
 
         for (int i = 0; i<n; i++)
             msg[i] = messaggi.remove(0);      //* rimuove i primi n messaggi dalla coda
 
         mutex.release();
-        libere.release(n);                          //* libera n permessi
+        libere.release(n);                          //* libera n permessi: incrementa il numero di posizioni libere di n
         return msg;
     }
 }
@@ -103,18 +105,45 @@ class CodaLimitata{
 class OutputMng{
     //* nel compito ho dfinito un mutex superfluo. Non è stato usato né nel compito scritto né in questo codice
     int[] results;
-    Semaphore piene = new Semaphore(0);
+    Semaphore piene = new Semaphore(0); //* indica il numero di messaggi caricati
 
     public OutputMng(int m){
         results = new int[m];
     }
     public void caricaValore(int idW, int value){
-        results[idW] = value;
+        results[idW] = value;       //* il worker carica il valore nella sua posizione
         piene.release();
     }
     public int[] prendiValori() throws InterruptedException {
         piene.acquire(results.length);
         return results;
+    }
+}
+
+class OutputThread extends Thread{
+    Worker[] workers;
+    OutputMng output;
+    int nStampe = 0;
+
+    public OutputThread(Worker[] workers, OutputMng output) {
+        this.workers = workers;
+        this.output = output;
+    }
+
+    @Override
+    public void run() {
+        try{
+            while (true){
+                int[] results = output.prendiValori();
+                System.out.print(getName()+": [ ");     //* ho aggiunto delle stampe in più per rendere più leggibile l'output
+                for (int i = 0; i<results.length; i++){
+                    workers[i].viaLibera.release();
+                    System.out.print(results[i]+" ");
+                }
+                System.out.println("]");
+                nStampe++;
+            }
+        }catch (InterruptedException e){}
     }
 }
 
@@ -149,32 +178,6 @@ class Worker extends Thread{
                 output.caricaValore(id, sum);
             }
         } catch (InterruptedException e) {}
-    }
-}
-class OutputThread extends Thread{
-    Worker[] workers;
-    OutputMng output;
-    int nStampe = 0;
-
-    public OutputThread(Worker[] workers, OutputMng output) {
-        this.workers = workers;
-        this.output = output;
-    }
-
-    @Override
-    public void run() {
-        try{
-            while (true){
-                int[] results = output.prendiValori();
-                System.out.print(getName()+": [ ");     //* ho aggiunto delle stampe in più per rendere più leggibile l'output
-                for (int i = 0; i<results.length; i++){
-                    workers[i].viaLibera.release();
-                    System.out.print(results[i]+" ");
-                }
-                System.out.println("]");
-                nStampe++;
-            }
-        }catch (InterruptedException e){}
     }
 }
 

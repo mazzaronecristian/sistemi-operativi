@@ -56,6 +56,7 @@ public class Compito20giu2023RosadiniG{
             System.out.println("W"+i+" ha elaborato "+workers[i].nWork+" risultati. ");
         }
         System.out.println();
+        System.out.println("numero messaggi rimasti in coda: "+om.piene.availablePermits());
         for( int i = 0; i < ot.length; i++){
             ot[i].interrupt();
             ot[i].join();
